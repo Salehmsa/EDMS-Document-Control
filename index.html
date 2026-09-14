@@ -1,0 +1,1752 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EDMS — Document Registry (local)</title>
+<style>
+  :root{color-scheme:light dark}
+  html,body{margin:0;padding:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+
+<style>
+:root{
+  --ground:#F4F6F9; --surface:#FFFFFF; --surface-2:#EDF0F4; --sunk:#E3E8EE;
+  --ink:#161B22; --ink-2:#3C4652; --ink-3:#6B7684;
+  --hair:#D8DDE4; --hair-2:#C2C9D3;
+  --accent:#153E75; --accent-soft:#E3EAF5; --accent-ink:#0E2A52;
+  --brass:#9A6E28; --brass-soft:#F7EFDF;
+  --ok:#2C6E3C; --ok-soft:#E0EFE3;
+  --warn:#A8690B; --warn-soft:#FAEEDA;
+  --crit:#A02828; --crit-soft:#F9E3E3;
+  --dead:#6B1414; --dead-soft:#EED6D6;
+  --shadow:0 1px 2px rgba(21,62,117,.06),0 6px 20px -10px rgba(21,62,117,.18);
+  --serif:"Cambria",Georgia,"Times New Roman",serif;
+  --sans:"Segoe UI","Segoe UI Arabic",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:"Consolas",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0E1217; --surface:#161B22; --surface-2:#1D242D; --sunk:#0A0D11;
+  --ink:#E6EAF0; --ink-2:#BAC3CF; --ink-3:#8A96A5;
+  --hair:#2A323D; --hair-2:#3A4450;
+  --accent:#7BA8E2; --accent-soft:#1B2A40; --accent-ink:#A9C6EE;
+  --brass:#D0A15C; --brass-soft:#2C2416;
+  --ok:#6FBE81; --ok-soft:#16301C;
+  --warn:#E0A144; --warn-soft:#33250E;
+  --crit:#E3787A; --crit-soft:#351A1A;
+  --dead:#C25757; --dead-soft:#2A1212;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 26px -12px rgba(0,0,0,.7);
+}}
+:root[data-theme="dark"]{
+  --ground:#0E1217; --surface:#161B22; --surface-2:#1D242D; --sunk:#0A0D11;
+  --ink:#E6EAF0; --ink-2:#BAC3CF; --ink-3:#8A96A5;
+  --hair:#2A323D; --hair-2:#3A4450;
+  --accent:#7BA8E2; --accent-soft:#1B2A40; --accent-ink:#A9C6EE;
+  --brass:#D0A15C; --brass-soft:#2C2416;
+  --ok:#6FBE81; --ok-soft:#16301C;
+  --warn:#E0A144; --warn-soft:#33250E;
+  --crit:#E3787A; --crit-soft:#351A1A;
+  --dead:#C25757; --dead-soft:#2A1212;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 26px -12px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── shell ─────────────────────────────────────────── */
+.app{display:grid;grid-template-columns:1fr;min-height:100vh}
+@media (min-width:920px){.app{grid-template-columns:212px 1fr}}
+
+.side{background:var(--surface);border-bottom:1px solid var(--hair);padding:16px}
+@media (min-width:920px){.side{border-bottom:none;border-inline-end:1px solid var(--hair);position:sticky;top:0;height:100vh;overflow-y:auto;padding:20px 16px}}
+.brand{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.brand b{font-family:var(--serif);font-size:21px;font-weight:600;letter-spacing:-.02em;color:var(--accent)}
+.brand span{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--brass);text-transform:uppercase}
+.brand-sub{font-size:11.5px;color:var(--ink-3);margin-bottom:18px;direction:rtl;text-align:start}
+nav{display:flex;flex-wrap:wrap;gap:3px}
+@media (min-width:920px){nav{flex-direction:column;flex-wrap:nowrap}}
+nav button{display:flex;align-items:center;gap:9px;width:100%;text-align:start;background:none;border:none;
+  padding:7px 10px;border-radius:4px;cursor:pointer;font-size:13.5px;color:var(--ink-2)}
+nav button:hover{background:var(--surface-2)}
+nav button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+nav button .ct{margin-inline-start:auto;font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:8px;background:var(--surface-2);color:var(--ink-3)}
+nav button.on .ct{background:var(--surface);color:var(--accent)}
+nav button .ct.alarm{background:var(--crit-soft);color:var(--crit);font-weight:600}
+.side-foot{margin-top:20px;padding-top:14px;border-top:1px solid var(--hair);font-size:11px;color:var(--ink-3)}
+.side-foot button{background:none;border:1px solid var(--hair);border-radius:4px;padding:5px 9px;font-size:11.5px;cursor:pointer;color:var(--ink-2);margin-top:8px;width:100%}
+.side-foot button:hover{border-color:var(--accent);color:var(--accent)}
+
+main{padding:18px 16px 64px;min-width:0}
+@media (min-width:920px){main{padding:26px 28px 72px}}
+
+.head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+.head h1{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.015em;margin:0}
+.head .sub{font-size:13px;color:var(--ink-3);margin-top:2px}
+.head .ar{font-size:13px;color:var(--ink-3);direction:rtl}
+
+/* ── banners ───────────────────────────────────────── */
+.banner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-radius:4px;
+  font-size:13px;margin-bottom:16px;border-inline-start:3px solid var(--accent);background:var(--surface)}
+.banner.warn{border-inline-start-color:var(--warn);background:var(--warn-soft)}
+.banner.crit{border-inline-start-color:var(--crit);background:var(--crit-soft)}
+.banner .grow{flex:1;min-width:180px}
+.banner button{background:var(--surface);border:1px solid var(--hair-2);border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer}
+
+/* ── cards & tiles ─────────────────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;background:var(--hair);
+  border:1px solid var(--hair);border-radius:4px;overflow:hidden;margin-bottom:20px}
+.tile{background:var(--surface);padding:14px 16px}
+.tile .v{font-family:var(--serif);font-size:30px;font-weight:600;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.tile .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);margin-top:5px}
+.panel{background:var(--surface);border:1px solid var(--hair);border-radius:4px;margin-bottom:18px}
+.panel-h{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+  padding:13px 16px;border-bottom:1px solid var(--hair)}
+.panel-h h2{font-family:var(--serif);font-size:16px;font-weight:600;margin:0}
+.panel-h .note{font-size:12px;color:var(--ink-3)}
+.panel-b{padding:16px}
+
+/* health */
+.health{display:grid;gap:18px;align-items:center;grid-template-columns:1fr}
+@media (min-width:700px){.health{grid-template-columns:170px 1fr}}
+.gauge{position:relative;width:150px;height:150px;margin-inline:auto}
+.gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.gauge .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.gauge .val b{font-family:var(--serif);font-size:40px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.gauge .val span{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:4px}
+.hb{display:flex;flex-direction:column;gap:7px}
+.hb-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-size:13px}
+.hb-bar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.hb-bar i{display:block;height:100%;border-radius:3px}
+.hb-row .n{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px;min-width:34px;text-align:end}
+
+/* ── table ─────────────────────────────────────────── */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:940px}
+td:first-child,th:first-child{min-width:230px}
+th{text-align:start;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:500;color:var(--ink-3);padding:9px 12px;border-bottom:1px solid var(--hair-2);
+  background:var(--surface-2);white-space:nowrap;position:sticky;top:0;z-index:1}
+th.s{cursor:pointer;user-select:none}
+th.s:hover{color:var(--accent)}
+td{padding:9px 12px;border-bottom:1px solid var(--hair);vertical-align:middle}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr.risk-Black td:first-child{box-shadow:inset 3px 0 0 var(--dead)}
+tbody tr.risk-Red td:first-child{box-shadow:inset 3px 0 0 var(--crit)}
+tbody tr.risk-Amber td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+tbody tr.risk-Green td:first-child{box-shadow:inset 3px 0 0 var(--ok)}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.docname{font-weight:600}
+.docmeta{font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
+.empty{padding:40px 16px;text-align:center;color:var(--ink-3);font-size:13.5px}
+
+/* days bar */
+.dbar{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.dbar .t{width:56px;height:6px;border-radius:3px;background:var(--sunk);overflow:hidden;flex:none}
+.dbar .t i{display:block;height:100%;border-radius:3px}
+.dbar .n{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;min-width:62px}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;font-weight:500;
+  letter-spacing:.03em;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.crit{background:var(--crit-soft);color:var(--crit)}
+.chip.dead{background:var(--dead-soft);color:var(--dead)}
+.chip.acc{background:var(--accent-soft);color:var(--accent-ink)}
+.chip.brass{background:var(--brass-soft);color:var(--brass)}
+.chip.mute{background:var(--surface-2);color:var(--ink-3)}
+
+/* controls */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.inp,select.inp{background:var(--surface);border:1px solid var(--hair-2);border-radius:4px;padding:7px 10px;font-size:13px;min-width:0}
+.inp:focus{border-color:var(--accent)}
+input.inp[type=search]{flex:1;min-width:150px;max-width:320px}
+.btn{background:var(--surface);border:1px solid var(--hair-2);border-radius:4px;padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.pri:hover{filter:brightness(1.1);color:#fff}
+.btn.mini{padding:3px 8px;font-size:11.5px}
+.btn.danger:hover{border-color:var(--crit);color:var(--crit)}
+.seg{display:inline-flex;border:1px solid var(--hair-2);border-radius:4px;overflow:hidden}
+.seg button{background:var(--surface);border:none;padding:6px 11px;font-size:12.5px;cursor:pointer;color:var(--ink-2)}
+.seg button + button{border-inline-start:1px solid var(--hair)}
+.seg button.on{background:var(--accent);color:#fff;font-weight:600}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(10,14,20,.55);display:flex;align-items:flex-start;
+  justify-content:center;padding:20px 14px;overflow-y:auto;z-index:50}
+.modal{background:var(--surface);border-radius:6px;box-shadow:var(--shadow);width:100%;max-width:620px;margin-block:auto}
+.modal-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--hair)}
+.modal-h h3{font-family:var(--serif);font-size:18px;font-weight:600;margin:0}
+.modal-b{padding:18px;display:grid;gap:13px}
+.modal-f{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding:14px 18px;
+  border-top:1px solid var(--hair);position:sticky;bottom:0;background:var(--surface);border-radius:0 0 6px 6px}
+.grid2{display:grid;gap:13px;grid-template-columns:1fr}
+@media (min-width:520px){.grid2{grid-template-columns:1fr 1fr}}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fld label{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+.fld .hint{font-size:11.5px;color:var(--ink-3)}
+.fld input,.fld select,.fld textarea{background:var(--ground);border:1px solid var(--hair-2);border-radius:4px;padding:8px 10px;font-size:13.5px;width:100%}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--accent);background:var(--surface)}
+.err{color:var(--crit);font-size:12px}
+.x{background:none;border:none;font-size:20px;line-height:1;cursor:pointer;color:var(--ink-3);padding:2px 6px}
+.x:hover{color:var(--crit)}
+
+/* alerts */
+.alert-row{display:grid;gap:10px;grid-template-columns:1fr;padding:13px 16px;border-bottom:1px solid var(--hair)}
+@media (min-width:760px){.alert-row{grid-template-columns:1.6fr 0.7fr 2fr}}
+.alert-row:last-child{border-bottom:none}
+.alert-row .who{font-size:12.5px;color:var(--ink-2)}
+.alert-row .ch{display:flex;gap:5px;flex-wrap:wrap}
+
+/* audit */
+.ev{display:grid;grid-template-columns:1fr;gap:2px;padding:10px 16px;border-bottom:1px solid var(--hair);font-size:13px}
+@media (min-width:700px){.ev{grid-template-columns:150px 130px 1fr;gap:12px;align-items:baseline}}
+.ev:last-child{border-bottom:none}
+.ev .t{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+
+/* months */
+.months{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;align-items:end;height:110px}
+.mcol{display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:4px;min-width:0}
+.mcol .b{border-radius:2px 2px 0 0;min-height:2px}
+.mcol .lb{font-family:var(--mono);font-size:9px;color:var(--ink-3);text-align:center;white-space:nowrap;overflow:hidden}
+.mcol .cv{font-family:var(--mono);font-size:10px;text-align:center;font-variant-numeric:tabular-nums}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><b>EDMS</b><span>v1.0</span></div>
+    <div class="brand-sub">سجل الوثائق الرسمية</div>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      <div id="engine">—</div>
+      <button id="btnTheme" type="button">Toggle theme</button>
+    </div>
+  </aside>
+  <main id="main"><div class="empty">Loading…</div></main>
+</div>
+<div id="modalHost"></div>
+
+<script>
+(function () {
+"use strict";
+
+/* ══════════════════════════════════════════════════════════════════
+   1. STATUS ENGINE
+   The whole point of this app: days-to-expire and status are COMPUTED
+   on every render from the clock, never stored and never trusted from
+   a cached field. This is the bug that kills SharePoint trackers.
+   ══════════════════════════════════════════════════════════════════ */
+var DAY = 86400000;
+function todayUTC() { var n = new Date(); return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()); }
+function parseDay(s) {
+  if (!s) return null;
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+  if (!m) return null;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+}
+function daysToExpire(doc) {
+  var e = parseDay(doc.expiryDate);
+  if (e === null) return null;
+  return Math.round((e - todayUTC()) / DAY);
+}
+/* Excluded from expiry maths and from the health score. A draft has no
+   expiry obligation yet; an archived record no longer has one. */
+var TERMINAL = { Archived: 1, Superseded: 1, Draft: 1, 'Pending Approval': 1 };
+/* Hidden from the working registry — only these two are truly put away.
+   Drafts and items in approval are live work and must stay visible. */
+var PUT_AWAY = { Archived: 1, Superseded: 1 };
+
+function engine(doc) {
+  var d = daysToExpire(doc);
+  var base = doc.status || 'Valid';
+  if (TERMINAL[base]) return { days: d, status: base, risk: 'Green', active: false };
+  if (d === null)     return { days: null, status: base === 'Under Renewal' ? base : 'Valid', risk: 'Green', active: true };
+  var status = d < 0 ? 'Expired' : (base === 'Under Renewal' ? 'Under Renewal' : (d <= 30 ? 'Expiring Soon' : 'Valid'));
+  var risk   = d < 0 ? 'Black' : d <= 30 ? 'Red' : d <= 90 ? 'Amber' : 'Green';
+  return { days: d, status: status, risk: risk, active: true };
+}
+
+/* tier ladder — which rung does this document sit on today? */
+function tierToday(doc, type) {
+  var e = engine(doc);
+  if (!e.active) return null;
+  if (e.days === null) return null;
+  if (e.days < 0) return { tier: 'overdue', channels: channelsFor(type, -1), level: 3 };
+  var tiers = (type && type.tiers ? type.tiers : [90, 60, 30, 14, 7, 1]);
+  if (tiers.indexOf(e.days) === -1) return null;
+  var lvl = e.days <= 7 ? 3 : e.days <= 30 ? 2 : 1;
+  return { tier: e.days, channels: channelsFor(type, e.days), level: lvl };
+}
+function channelsFor(type, days) {
+  var allow = (type && type.channels) || ['Email', 'Teams'];
+  var out = [];
+  if (allow.indexOf('Email') > -1) out.push('Email');
+  if (allow.indexOf('Teams') > -1 && (days < 0 || days <= 90)) out.push('Teams');
+  if (allow.indexOf('SMS')   > -1 && (days < 0 || days <= 7))  out.push('SMS');
+  return out;
+}
+function recipientsFor(doc, level) {
+  var r = [];
+  if (doc.owner)       r.push(doc.owner);
+  if (doc.backupOwner) r.push(doc.backupOwner);
+  if (doc.deptOwner)   r.push(doc.deptOwner);
+  if (level >= 2 && doc.escalationMgr) r.push(doc.escalationMgr);
+  if (level >= 3 && doc.execSponsor)   r.push(doc.execSponsor);
+  r = r.filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+  /* Delegation is ADDITIVE. The delegate is added to the thread; the
+     accountable owner is never removed, so cover during leave never
+     becomes a quiet transfer of accountability. */
+  var extra = [];
+  r.forEach(function (person) {
+    activeDelegationsFor(person, doc.department).forEach(function (d) {
+      if (r.indexOf(d.delegate) === -1 && extra.indexOf(d.delegate) === -1) extra.push(d.delegate);
+    });
+  });
+  return r.concat(extra);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   1b. DELEGATION
+   A delegation is live only inside its window and only while not
+   revoked. It expires by itself — there is no cleanup step for anyone
+   to forget, which is the failure mode of every manual handover list.
+   ══════════════════════════════════════════════════════════════════ */
+function delegationState(d) {
+  if (d.revoked) return 'revoked';
+  var from = parseDay(d.validFrom), to = parseDay(d.validUntil), t = todayUTC();
+  if (from === null || to === null) return 'invalid';
+  if (t < from) return 'scheduled';
+  if (t > to)   return 'expired';
+  return 'active';
+}
+function activeDelegationsFor(person, dept) {
+  if (!person) return [];
+  return state.delegations.filter(function (d) {
+    if (delegationState(d) !== 'active') return false;
+    if (d.delegator !== person) return false;
+    if (d.scopeDept && dept && d.scopeDept !== dept) return false;
+    return true;
+  });
+}
+function delegateOf(person, dept) {
+  var a = activeDelegationsFor(person, dept);
+  return a.length ? a[0].delegate : '';
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   1c. APPROVAL CHAIN
+   Sequential and template-driven. Only the current step is actionable;
+   a rejection terminates the chain rather than leaving half-approved
+   steps dangling. Every decision is written once and never edited —
+   that is what makes the chain evidence rather than a status field.
+   ══════════════════════════════════════════════════════════════════ */
+var CHAINS = {
+  'Owner Only':                  ['Document Owner'],
+  'Owner + Compliance':          ['Document Owner', 'Compliance Officer'],
+  'Owner + Compliance + Legal':  ['Document Owner', 'Compliance Officer', 'Legal'],
+  'Executive':                   ['Document Owner', 'Compliance Officer', 'Executive Sponsor']
+};
+function approverFor(role, doc) {
+  if (role === 'Document Owner')    return doc.owner || '';
+  if (role === 'Compliance Officer')return doc.complianceOwner || state.settings.complianceOfficer || '';
+  if (role === 'Legal')             return state.settings.legalApprover || '';
+  if (role === 'Executive Sponsor') return doc.execSponsor || '';
+  return '';
+}
+function openApprovalFor(docId) {
+  for (var i = 0; i < state.approvals.length; i++) {
+    if (state.approvals[i].docId === docId && state.approvals[i].status === 'In Progress') return state.approvals[i];
+  }
+  return null;
+}
+function currentStep(ap) {
+  for (var i = 0; i < ap.steps.length; i++) if (ap.steps[i].outcome === 'Pending') return ap.steps[i];
+  return null;
+}
+function daysPending(ap) {
+  var s = parseDay((ap.startedAt || '').slice(0, 10));
+  return s === null ? 0 : Math.round((todayUTC() - s) / DAY);
+}
+function startApproval(doc, templateOverride) {
+  if (openApprovalFor(doc.id)) {
+    state.note = 'That document already has an approval in progress.'; render(); return null;
+  }
+  var t = typeOf(doc, state.types);
+  var tpl = templateOverride || (t && t.approval) || 'Owner Only';
+  var roles = CHAINS[tpl] || CHAINS['Owner Only'];
+  var ap = {
+    id: uid(), docId: doc.id, docName: doc.name, template: tpl,
+    startedAt: new Date().toISOString(), status: 'In Progress',
+    steps: roles.map(function (r, i) {
+      return { order: i + 1, role: r, approver: approverFor(r, doc),
+               outcome: 'Pending', respondedOn: '', comments: '', actedBy: '' };
+    })
+  };
+  state.approvals.unshift(ap);
+  var next = {}; for (var k in doc) if (Object.prototype.hasOwnProperty.call(doc, k)) next[k] = doc[k];
+  next.status = 'Pending Approval';
+  upsert(state.docs, next);
+  logEvent('approval', doc.name, 'Submitted for approval — chain: ' + tpl);
+  afterWrite();
+  return ap;
+}
+function decideStep(apId, outcome, comment, actedBy) {
+  var ap = state.approvals.filter(function (a) { return a.id === apId; })[0];
+  if (!ap || ap.status !== 'In Progress') return;
+  var step = currentStep(ap);
+  if (!step) return;
+  step.outcome = outcome;
+  step.respondedOn = new Date().toISOString();
+  step.comments = comment || '';
+  step.actedBy = actedBy || step.approver;
+
+  var doc = state.docs.filter(function (d) { return d.id === ap.docId; })[0];
+
+  if (outcome === 'Rejected') {
+    ap.status = 'Rejected';
+    ap.completedAt = new Date().toISOString();
+    /* Terminate the chain — later steps are marked, never left Pending,
+       so nothing dangles in someone's queue forever. */
+    ap.steps.forEach(function (s) { if (s.outcome === 'Pending') s.outcome = 'Not reached'; });
+    if (doc) { doc.status = 'Draft'; upsert(state.docs, doc); }
+    logEvent('approval', ap.docName, 'REJECTED at step ' + step.order + ' (' + step.role + ')' +
+      (comment ? ' — ' + comment : ''));
+  } else {
+    logEvent('approval', ap.docName, 'Approved at step ' + step.order + ' (' + step.role + ')' +
+      (step.actedBy !== step.approver ? ' by delegate ' + step.actedBy : ''));
+    if (!currentStep(ap)) {
+      ap.status = 'Approved';
+      ap.completedAt = new Date().toISOString();
+      if (doc) {
+        doc.status = 'Valid';
+        doc.versionLabel = nextVersion(doc.versionLabel);
+        doc.lastReviewed = new Date().toISOString().slice(0, 10);
+        upsert(state.docs, doc);
+      }
+      logEvent('approval', ap.docName, 'Chain complete — published as version ' + (doc ? doc.versionLabel : '?'));
+    }
+  }
+  afterWrite();
+  render();
+}
+function nextVersion(v) {
+  var n = parseFloat(v);
+  return isNaN(n) ? '1.0' : (n + 1).toFixed(1);
+}
+
+/* weighted compliance health — mirrors the DAX measure exactly */
+function health(docs, types) {
+  var active = docs.filter(function (d) { return engine(d).active; });
+  if (!active.length) return { score: null, parts: {} };
+  var p = { expMand: 0, expOpt: 0, soonMand: 0, unowned: 0, stale: 0 };
+  var cutoff = todayUTC() - 365 * DAY;
+  active.forEach(function (d) {
+    var e = engine(d), mand = isMandatory(d, types);
+    if (e.status === 'Expired') { mand ? p.expMand++ : p.expOpt++; }
+    else if (e.status === 'Expiring Soon' && mand) p.soonMand++;
+    if (!d.owner) p.unowned++;
+    var rv = parseDay(d.lastReviewed);
+    if (rv === null || rv < cutoff) p.stale++;
+  });
+  var penalty = p.expMand * 6 + p.expOpt * 2 + p.soonMand + p.unowned * 2 + p.stale;
+  var score = Math.max(0, Math.round(100 - (penalty / (active.length * 6)) * 100));
+  return { score: score, parts: p, total: active.length };
+}
+function isMandatory(doc, types) {
+  if (typeof doc.mandatory === 'boolean') return doc.mandatory;
+  var t = typeOf(doc, types);
+  return !!(t && t.mandatory);
+}
+function typeOf(doc, types) {
+  for (var i = 0; i < types.length; i++) if (types[i].id === doc.typeId) return types[i];
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   2. STORE — this computer only
+   Everything lives in this browser's local storage, under this file.
+   No network call is ever made. Nothing leaves the machine.
+   Local storage can be cleared by the browser or by IT policy, so the
+   JSON backup is not optional — the app nags for one every 20 saves.
+   ══════════════════════════════════════════════════════════════════ */
+var KEY = 'edms.local.v1';
+var PERSIST = true, STORAGE_OK = true, writeCount = 0;
+
+function persist() {
+  if (!STORAGE_OK) return;
+  try {
+    localStorage.setItem(KEY, JSON.stringify({
+      docs: state.docs, types: state.types, audit: state.audit,
+      approvals: state.approvals, delegations: state.delegations, settings: state.settings,
+      savedAt: new Date().toISOString(), writes: writeCount
+    }));
+  } catch (e) {
+    STORAGE_OK = false; PERSIST = false;
+    state.note = (e && e.name === 'QuotaExceededError')
+      ? 'Local storage is full. Export a JSON backup, then remove archived rows.'
+      : 'This browser is blocking local storage, so nothing is being saved. Export a JSON backup before you close the tab.';
+  }
+}
+function load() {
+  var raw = null;
+  try { raw = localStorage.getItem(KEY); }
+  catch (e) { STORAGE_OK = false; PERSIST = false; return false; }
+  if (!raw) return false;
+  try {
+    var o = JSON.parse(raw);
+    state.docs        = Array.isArray(o.docs)        ? o.docs        : [];
+    state.types       = Array.isArray(o.types)       ? o.types       : [];
+    state.audit       = Array.isArray(o.audit)       ? o.audit       : [];
+    state.approvals   = Array.isArray(o.approvals)   ? o.approvals   : [];
+    state.delegations = Array.isArray(o.delegations) ? o.delegations : [];
+    state.settings    = o.settings && typeof o.settings === 'object'
+                      ? o.settings : { complianceOfficer: '', legalApprover: '' };
+    writeCount  = o.writes || 0;
+    return true;
+  } catch (e) { return false; }
+}
+function afterWrite() {
+  writeCount++;
+  persist();
+  if (STORAGE_OK && writeCount % 20 === 0) {
+    state.note = 'You have made ' + writeCount + ' changes. Export a JSON backup — local storage is not a backup.';
+  }
+}
+var state = {
+  docs: [], types: [], audit: [], approvals: [], delegations: [],
+  settings: { complianceOfficer: '', legalApprover: '' },
+  view: 'dashboard', filter: 'all', q: '', sort: 'days', dir: 1,
+  ready: false, note: ''
+};
+/* Saudi document types, seeded on first run. Edit them freely in the app —
+   the ladder, validity and approval chain are data, not code. */
+var SEED_TYPES = [
+  { id:'cr',           name:'Commercial Registration', nameAr:'السجل التجاري',                months:12, mandatory:true,  tiers:[120,90,60,30,14,7,1], channels:['Email','Teams','SMS'], approval:'Owner + Compliance + Legal', retention:10 },
+  { id:'chamber',      name:'Chamber of Commerce',     nameAr:'الاشتراك بالغرفة التجارية',    months:12, mandatory:true,  tiers:[90,60,30,14,7,1],     channels:['Email','Teams'],       approval:'Owner + Compliance',         retention:7  },
+  { id:'iso9001',      name:'ISO 9001 Certificate',    nameAr:'شهادة الأيزو 9001',            months:36, mandatory:true,  tiers:[180,120,90,60,30,14], channels:['Email','Teams'],       approval:'Owner + Compliance',         retention:10 },
+  { id:'zakat',        name:'Zakat & Tax Certificate', nameAr:'شهادة الزكاة والضريبة',         months:12, mandatory:true,  tiers:[90,60,30,14,7,1],     channels:['Email','Teams','SMS'], approval:'Owner + Compliance',         retention:10 },
+  { id:'gosi',         name:'GOSI Certificate',        nameAr:'شهادة التأمينات الاجتماعية',    months:3,  mandatory:true,  tiers:[30,14,7,3,1],         channels:['Email','Teams','SMS'], approval:'Owner Only',                 retention:7  },
+  { id:'nitaqat',      name:'Saudization (Nitaqat)',   nameAr:'شهادة السعودة - نطاقات',        months:3,  mandatory:true,  tiers:[30,14,7,3,1],         channels:['Email','Teams'],       approval:'Owner Only',                 retention:7  },
+  { id:'municipality', name:'Municipality Licence',    nameAr:'رخصة البلدية',                  months:12, mandatory:true,  tiers:[90,60,30,14,7,1],     channels:['Email','Teams','SMS'], approval:'Owner + Compliance',         retention:7  },
+  { id:'insurance',    name:'Insurance Policy',        nameAr:'وثيقة تأمين',                   months:12, mandatory:true,  tiers:[90,60,30,14,7,1],     channels:['Email','Teams'],       approval:'Owner + Compliance',         retention:7  },
+  { id:'guarantee',    name:'Bank Guarantee',          nameAr:'ضمان بنكي',                     months:0,  mandatory:false, tiers:[120,90,60,30,14,7,1], channels:['Email','Teams','SMS'], approval:'Executive',                  retention:10 },
+  { id:'contract',     name:'Client Contract',         nameAr:'عقد عميل',                      months:0,  mandatory:false, tiers:[180,120,90,60,30],    channels:['Email','Teams'],       approval:'Owner + Compliance + Legal', retention:10 }
+];
+
+/* A few clearly-fictional rows so the app opens in a working state.
+   Dates are generated relative to first run, so the demo always makes sense. */
+function seedDocs() {
+  function iso(off) { return new Date(todayUTC() + off * DAY).toISOString().slice(0, 10); }
+  return [
+    { id:'ex1', name:'السجل التجاري', nameEn:'Commercial Registration', number:'10100000000', typeId:'cr',
+      company:'Head Office', department:'Legal & Governance', authority:'وزارة التجارة', country:'KSA',
+      issueDate:iso(-275), expiryDate:iso(90), owner:'Legal Coordinator', backupOwner:'Executive Secretary',
+      escalationMgr:'Legal Manager', execSponsor:'Managing Director', lastReviewed:iso(-100),
+      status:'Valid', isSample:true, notes:'Example row — fictional number.' },
+    { id:'ex2', name:'شهادة التأمينات الاجتماعية', nameEn:'GOSI Certificate', number:'GOSI-000000', typeId:'gosi',
+      company:'Head Office', department:'Human Resources', authority:'التأمينات الاجتماعية', country:'KSA',
+      issueDate:iso(-85), expiryDate:iso(7), owner:'HR Officer', backupOwner:'HR Manager',
+      escalationMgr:'HR Manager', execSponsor:'Managing Director', lastReviewed:iso(-85),
+      status:'Valid', isSample:true, notes:'Example row — sits on the T-7 rung today, so SMS and the executive sponsor activate.' },
+    { id:'ex3', name:'رخصة البلدية', nameEn:'Municipality Licence', number:'MUN-000000', typeId:'municipality',
+      company:'Head Office', department:'Administration', authority:'أمانة المنطقة', country:'KSA',
+      issueDate:iso(-388), expiryDate:iso(-23), owner:'Administration Officer',
+      escalationMgr:'Admin Manager', execSponsor:'Managing Director', lastReviewed:iso(-388),
+      status:'Valid', isSample:true, notes:'Example row — deliberately lapsed, to show the overdue state.' },
+    { id:'ex4', name:'شهادة السعودة (نطاقات)', nameEn:'Saudization Certificate', number:'NIT-000000', typeId:'nitaqat',
+      company:'Head Office', department:'Human Resources', authority:'وزارة الموارد البشرية', country:'KSA',
+      issueDate:iso(-78), expiryDate:iso(14), owner:'HR Officer',
+      escalationMgr:'HR Manager', execSponsor:'Managing Director', lastReviewed:iso(-78),
+      status:'Valid', isSample:true, notes:'Example row — hits the T-14 rung today.' },
+    { id:'ex6', name:'عقد عميل - مشروع التحول الرقمي', nameEn:'Client Contract — Digital Transformation', number:'CTR-000000', typeId:'contract',
+      company:'Head Office', department:'Legal & Governance', authority:'Client', country:'KSA',
+      issueDate:iso(-5), expiryDate:iso(540), owner:'Legal Coordinator', backupOwner:'Executive Secretary',
+      escalationMgr:'Legal Manager', execSponsor:'Managing Director',
+      status:'Draft', isSample:true, notes:'Example row — a draft waiting to be submitted. Open Approvals to send it through its chain.' },
+    { id:'ex5', name:'الاشتراك بالغرفة التجارية', nameEn:'Chamber of Commerce', number:'00000', typeId:'chamber',
+      company:'Head Office', department:'Legal & Governance', authority:'الغرفة التجارية', country:'KSA',
+      issueDate:iso(-2), expiryDate:iso(363), owner:'',
+      escalationMgr:'Legal Manager', execSponsor:'Managing Director',
+      status:'Valid', isSample:true, notes:'Example row — no owner and no review date, to show how governance gaps surface.' }
+  ];
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+function logEvent(type, entity, detail) {
+  var ev = { t: new Date().toISOString(), type: type, entity: entity, detail: detail };
+  state.audit.unshift(ev);
+  state.audit = state.audit.slice(0, 400);
+  persist();
+}
+function saveDoc(doc)  { upsert(state.docs, doc);  afterWrite(); render(); }
+function removeDoc(id) { state.docs = state.docs.filter(function (d) { return d.id !== id; }); afterWrite(); render(); }
+function saveType(t)   { upsert(state.types, t);   afterWrite(); render(); }
+function upsert(arr, obj) {
+  for (var i = 0; i < arr.length; i++) if (arr[i].id === obj.id) { arr[i] = obj; return; }
+  arr.push(obj);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   3. RENDER
+   ══════════════════════════════════════════════════════════════════ */
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function fmtDate(s) {
+  var d = parseDay(s);
+  if (d === null) return '—';
+  var x = new Date(d);
+  return x.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+var STATUS_CHIP = {
+  'Valid': 'ok', 'Expiring Soon': 'warn', 'Expired': 'crit', 'Under Renewal': 'acc',
+  'Pending Approval': 'brass', 'Draft': 'mute', 'Archived': 'mute', 'Superseded': 'mute'
+};
+var RISK_COLOR = { Green: 'var(--ok)', Amber: 'var(--warn)', Red: 'var(--crit)', Black: 'var(--dead)' };
+
+function counts() {
+  var c = { all: 0, expiring30: 0, expiring90: 0, expired: 0, mandatory: 0, renewal: 0, alerts: 0, gaps: 0,
+            pendingApprovals: 0, overdueApprovals: 0, activeDelegations: 0 };
+  state.approvals.forEach(function (a) {
+    if (a.status !== 'In Progress') return;
+    c.pendingApprovals++;
+    if (daysPending(a) > 7) c.overdueApprovals++;
+  });
+  state.delegations.forEach(function (d) { if (delegationState(d) === 'active') c.activeDelegations++; });
+  state.docs.forEach(function (d) {
+    var e = engine(d);
+    if (!e.active) return;
+    c.all++;
+    if (e.status === 'Expired') c.expired++;
+    else if (e.days !== null && e.days <= 30) c.expiring30++;
+    if (e.days !== null && e.days >= 0 && e.days <= 90) c.expiring90++;
+    if (isMandatory(d, state.types)) c.mandatory++;
+    if (e.status === 'Under Renewal') c.renewal++;
+    if (tierToday(d, typeOf(d, state.types))) c.alerts++;
+    var rv = parseDay(d.lastReviewed);
+    if (!d.owner || !d.fileUrl || rv === null || rv < todayUTC() - 365 * DAY) c.gaps++;
+  });
+  return c;
+}
+
+var NAV = [
+  ['dashboard',   'Dashboard',    'لوحة التحكم'],
+  ['registry',    'Registry',     'السجل'],
+  ['alerts',      'Alerts today', 'تنبيهات اليوم'],
+  ['approvals',   'Approvals',    'الموافقات'],
+  ['delegations', 'Delegations',  'التفويض'],
+  ['types',       'Policy types', 'أنواع الوثائق'],
+  ['audit',       'Audit trail',  'سجل التدقيق']
+];
+
+function renderNav() {
+  var c = counts();
+  var badge = { registry: c.all, alerts: c.alerts, approvals: c.pendingApprovals,
+                delegations: c.activeDelegations, types: state.types.length, audit: state.audit.length };
+  $('nav').innerHTML = NAV.map(function (n) {
+    var b = badge[n[0]];
+    var alarm = (n[0] === 'alerts' && c.alerts > 0) ||
+                (n[0] === 'approvals' && c.overdueApprovals > 0);
+    return '<button type="button" data-view="' + n[0] + '" class="' + (state.view === n[0] ? 'on' : '') + '">' +
+      '<span>' + esc(n[1]) + '</span>' +
+      (b === undefined ? '' : '<span class="ct' + (alarm ? ' alarm' : '') + '">' + b + '</span>') +
+      '</button>';
+  }).join('');
+  $('engine').innerHTML = 'Status engine ran<br><b style="color:var(--ok)">' +
+    new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) +
+    '</b> — on every page load.<br><br>' +
+    (STORAGE_OK
+      ? '<span style="color:var(--ok)">◉ Offline — this computer only.</span><br>' +
+        '<span style="color:var(--ink-3)">No network. Nothing leaves this machine.</span>'
+      : '<span style="color:var(--warn)">◉ Storage blocked — export a backup.</span>');
+}
+
+function render() {
+  renderNav();
+  var v = state.view, html = '';
+  if (!state.ready) html = '<div class="empty">Loading…</div>';
+  else if (v === 'dashboard') html = viewDashboard();
+  else if (v === 'registry')  html = viewRegistry();
+  else if (v === 'alerts')      html = viewAlerts();
+  else if (v === 'approvals')   html = viewApprovals();
+  else if (v === 'delegations') html = viewDelegations();
+  else if (v === 'types')       html = viewTypes();
+  else                          html = viewAudit();
+  $('main').innerHTML = html;
+}
+
+/* ── approvals ─────────────────────────────────────── */
+function viewApprovals() {
+  var open = state.approvals.filter(function (a) { return a.status === 'In Progress'; });
+  var done = state.approvals.filter(function (a) { return a.status !== 'In Progress'; }).slice(0, 25);
+  var drafts = state.docs.filter(function (d) { return (d.status || '') === 'Draft'; });
+
+  var settingsCard =
+    '<div class="panel"><div class="panel-h"><h2>Standing approvers</h2>' +
+      '<span class="note">Used when a chain reaches a role the document itself does not name.</span></div>' +
+      '<div class="panel-b"><div class="bar" style="margin:0">' +
+        '<label style="font-size:12.5px;color:var(--ink-3)">Compliance Officer</label>' +
+        '<input class="inp" id="setCompliance" value="' + esc(state.settings.complianceOfficer) + '" placeholder="name or email">' +
+        '<label style="font-size:12.5px;color:var(--ink-3)">Legal approver</label>' +
+        '<input class="inp" id="setLegal" value="' + esc(state.settings.legalApprover) + '" placeholder="name or email">' +
+        '<button class="btn" id="btnSaveSettings" type="button">Save</button>' +
+      '</div></div></div>';
+
+  var draftCard = drafts.length
+    ? '<div class="panel"><div class="panel-h"><h2>' + drafts.length + ' draft(s) ready to submit</h2>' +
+        '<span class="note">The chain comes from the document\'s policy type.</span></div>' +
+        drafts.map(function (d) {
+          var t = typeOf(d, state.types);
+          return '<div class="alert-row"><div><div class="docname">' + esc(d.name) + '</div>' +
+            '<div class="docmeta">' + esc(d.number || '—') + ' · ' + esc(t ? t.name : 'no type') + '</div></div>' +
+            '<div><span class="chip mute">' + esc((t && t.approval) || 'Owner Only') + '</span></div>' +
+            '<div><button class="btn mini" data-submit="' + esc(d.id) + '" type="button">Submit for approval</button></div></div>';
+        }).join('') + '</div>'
+    : '';
+
+  var openCard = '<div class="panel"><div class="panel-h"><h2>' + open.length + ' approval(s) in progress</h2>' +
+    '<span class="note">Only the current step can act. A rejection ends the chain.</span></div>' +
+    (open.length ? open.map(approvalCard).join('') :
+      '<div class="empty">Nothing awaiting a decision.</div>') + '</div>';
+
+  var doneCard = done.length ? '<div class="panel"><div class="panel-h"><h2>Completed</h2>' +
+    '<span class="note">Immutable record — decisions are written once.</span></div>' +
+    done.map(approvalCard).join('') + '</div>' : '';
+
+  return head('Approvals', 'Sequential chains driven by document type. Every decision is evidence.', 'الموافقات') +
+    noteBanner() + settingsCard + draftCard + openCard + doneCard;
+}
+
+function approvalCard(ap) {
+  var cur = currentStep(ap);
+  var dp = daysPending(ap);
+  var late = ap.status === 'In Progress' && dp > 7;
+  var statusChip = ap.status === 'Approved' ? 'ok' : ap.status === 'Rejected' ? 'crit' : (late ? 'warn' : 'acc');
+
+  var steps = ap.steps.map(function (s) {
+    var col = s.outcome === 'Approved' ? 'ok' : s.outcome === 'Rejected' ? 'crit'
+            : s.outcome === 'Not reached' ? 'mute' : (cur && s.order === cur.order ? 'warn' : 'mute');
+    var mark = s.outcome === 'Approved' ? '✓' : s.outcome === 'Rejected' ? '✕'
+             : s.outcome === 'Not reached' ? '–' : s.order;
+    var deleg = s.outcome === 'Pending' ? delegateOf(s.approver, docDept(ap.docId)) : '';
+    return '<div style="display:flex;gap:9px;align-items:flex-start;padding:6px 0">' +
+      '<span class="chip ' + col + '" style="min-width:22px;justify-content:center">' + mark + '</span>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:13px"><b>' + esc(s.role) + '</b> — ' +
+          esc(s.approver || '<span style="color:var(--crit)">unassigned</span>') +
+          (deleg ? ' <span class="chip brass">delegate: ' + esc(deleg) + '</span>' : '') + '</div>' +
+        (s.respondedOn ? '<div class="docmeta">' + esc(s.outcome) + ' ' +
+            esc(new Date(s.respondedOn).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })) +
+            (s.actedBy && s.actedBy !== s.approver ? ' · acted by ' + esc(s.actedBy) : '') +
+            (s.comments ? ' · “' + esc(s.comments) + '”' : '') + '</div>' : '') +
+      '</div></div>';
+  }).join('');
+
+  return '<div style="padding:14px 16px;border-bottom:1px solid var(--hair)">' +
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between">' +
+      '<div><span class="docname">' + esc(ap.docName) + '</span> ' +
+        '<span class="chip ' + statusChip + '">' + esc(ap.status) + '</span>' +
+        (late ? ' <span class="chip crit">' + dp + ' days pending</span>' : '') + '</div>' +
+      '<div class="docmeta">' + esc(ap.template) + ' · started ' +
+        esc(new Date(ap.startedAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })) + '</div>' +
+    '</div>' +
+    '<div style="margin-top:6px">' + steps + '</div>' +
+    (ap.status === 'In Progress'
+      ? '<div style="display:flex;gap:8px;margin-top:8px">' +
+          '<button class="btn mini pri" data-decide="' + esc(ap.id) + '" data-out="Approved" type="button">Approve step ' + (cur ? cur.order : '') + '</button>' +
+          '<button class="btn mini danger" data-decide="' + esc(ap.id) + '" data-out="Rejected" type="button">Reject</button>' +
+        '</div>' : '') +
+    '</div>';
+}
+function docDept(docId) {
+  var d = state.docs.filter(function (x) { return x.id === docId; })[0];
+  return d ? d.department : '';
+}
+
+/* ── delegations ───────────────────────────────────── */
+function viewDelegations() {
+  var rows = state.delegations.slice().sort(function (a, b) {
+    var rank = { active: 0, scheduled: 1, expired: 2, revoked: 3, invalid: 4 };
+    return (rank[delegationState(a)] || 9) - (rank[delegationState(b)] || 9);
+  });
+  var CHIP = { active: 'ok', scheduled: 'acc', expired: 'mute', revoked: 'crit', invalid: 'warn' };
+
+  return head('Temporary delegation', 'Cover during leave that expires by itself — no cleanup step to forget.', 'التفويض المؤقت') +
+    noteBanner() +
+    '<div class="banner"><span class="grow"><b>Delegation is additive.</b> The delegate is added to alert threads and may act on ' +
+      'approval steps, but the accountable owner is never removed. Nothing silently changes hands.</span></div>' +
+    '<div class="bar"><button class="btn pri" id="btnAddDeleg" type="button">+ New delegation</button></div>' +
+    '<div class="panel"><div class="tw"><table><thead><tr>' +
+      '<th>Delegator</th><th>Delegate</th><th>Scope</th><th>From</th><th>Until</th><th>State</th><th>Reason</th><th></th>' +
+    '</tr></thead><tbody>' +
+    (rows.length ? rows.map(function (d) {
+      var st = delegationState(d);
+      var left = st === 'active' ? Math.round((parseDay(d.validUntil) - todayUTC()) / DAY) : null;
+      return '<tr>' +
+        '<td><div class="docname">' + esc(d.delegator) + '</div></td>' +
+        '<td>' + esc(d.delegate) + '</td>' +
+        '<td>' + esc(d.scopeDept || 'all departments') + '</td>' +
+        '<td class="num">' + fmtDate(d.validFrom) + '</td>' +
+        '<td class="num">' + fmtDate(d.validUntil) + '</td>' +
+        '<td><span class="chip ' + (CHIP[st] || 'mute') + '">' + esc(st) + '</span>' +
+          (left !== null ? '<div class="docmeta">' + left + 'd left</div>' : '') + '</td>' +
+        '<td style="font-size:12px;color:var(--ink-3)">' + esc(d.reason || '—') + '</td>' +
+        '<td style="white-space:nowrap">' +
+          (st === 'active' || st === 'scheduled'
+            ? '<button class="btn mini danger" data-revoke="' + esc(d.id) + '" type="button">Revoke</button> ' : '') +
+          '<button class="btn mini" data-deldeleg="' + esc(d.id) + '" type="button">Delete</button>' +
+        '</td></tr>';
+    }).join('') : '<tr><td colspan="8"><div class="empty">No delegations recorded. Add one before someone goes on leave, not after.</div></td></tr>') +
+    '</tbody></table></div></div>';
+}
+
+/* ── dashboard ─────────────────────────────────────── */
+function viewDashboard() {
+  var c = counts(), h = health(state.docs, state.types);
+  var score = h.score === null ? '—' : h.score;
+  var band = h.score === null ? 'No data' : h.score >= 95 ? 'Excellent' : h.score >= 85 ? 'Good' : h.score >= 70 ? 'At risk' : 'Critical';
+  var col = h.score === null ? 'var(--ink-3)' : h.score >= 95 ? 'var(--ok)' : h.score >= 85 ? 'var(--ok)' : h.score >= 70 ? 'var(--warn)' : 'var(--crit)';
+  var R = 62, C = 2 * Math.PI * R, off = h.score === null ? C : C * (1 - h.score / 100);
+
+  var line = c.expired > 0 ? '<div class="banner crit"><span class="grow"><b>' + c.expired +
+      ' document(s) have lapsed.</b> Immediate action required — see the registry.</span></div>'
+    : c.expiring30 > 0 ? '<div class="banner warn"><span class="grow"><b>' + c.expiring30 +
+      ' document(s) expire within 30 days.</b></span></div>'
+    : c.all > 0 ? '<div class="banner"><span class="grow">All documents current.</span></div>' : '';
+
+  var parts = [
+    ['Expired · mandatory', h.parts.expMand || 0, 'var(--dead)'],
+    ['Expired · optional',  h.parts.expOpt || 0,  'var(--crit)'],
+    ['Expiring · mandatory',h.parts.soonMand || 0,'var(--warn)'],
+    ['No owner assigned',   h.parts.unowned || 0, 'var(--brass)'],
+    ['Not reviewed in 12m', h.parts.stale || 0,   'var(--ink-3)']
+  ];
+  var maxp = Math.max(1, h.total || 1);
+
+  return head('Compliance dashboard', 'Every figure below is recomputed from today\'s date, not read from a stored column.', 'لوحة الامتثال') +
+    noteBanner() + sampleBanner() + line +
+    '<div class="tiles">' +
+      tile(c.all, 'Active documents') +
+      tile(c.expired, 'Expired', c.expired ? 'var(--crit)' : '') +
+      tile(c.expiring30, 'Expiring ≤ 30 days', c.expiring30 ? 'var(--warn)' : '') +
+      tile(c.expiring90, 'Expiring ≤ 90 days') +
+      tile(c.gaps, 'Governance gaps', c.gaps ? 'var(--brass)' : '') +
+    '</div>' +
+
+    '<div class="panel"><div class="panel-h"><h2>Compliance health score</h2>' +
+      '<span class="note">A lapsed mandatory document costs 6 points; an optional one, 2.</span></div>' +
+      '<div class="panel-b"><div class="health">' +
+        '<div class="gauge"><svg viewBox="0 0 150 150" role="img" aria-label="Compliance health score ' + score + ' out of 100">' +
+          '<circle cx="75" cy="75" r="' + R + '" fill="none" stroke="var(--sunk)" stroke-width="11"/>' +
+          '<circle cx="75" cy="75" r="' + R + '" fill="none" stroke="' + col + '" stroke-width="11" stroke-linecap="round" ' +
+            'stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/>' +
+        '</svg><div class="val"><b style="color:' + col + '">' + score + '</b><span>' + esc(band) + '</span></div></div>' +
+        '<div class="hb">' + parts.map(function (p) {
+          return '<div class="hb-row"><div><div style="margin-bottom:4px">' + esc(p[0]) + '</div>' +
+            '<div class="hb-bar"><i style="width:' + Math.min(100, (p[1] / maxp) * 100).toFixed(1) + '%;background:' + p[2] + '"></i></div></div>' +
+            '<span class="n">' + p[1] + '</span></div>';
+        }).join('') + '</div>' +
+      '</div></div></div>' +
+
+    monthsPanel() +
+    criticalPanel();
+}
+
+function monthsPanel() {
+  var now = new Date(), buckets = [], labels = [];
+  for (var i = 0; i < 12; i++) {
+    var d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1));
+    buckets.push(0);
+    labels.push(d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }) +
+      (d.getUTCMonth() === 0 ? " '" + String(d.getUTCFullYear()).slice(2) : ''));
+  }
+  state.docs.forEach(function (doc) {
+    var e = engine(doc);
+    if (!e.active) return;
+    var x = parseDay(doc.expiryDate);
+    if (x === null) return;
+    var dt = new Date(x);
+    var idx = (dt.getUTCFullYear() - now.getUTCFullYear()) * 12 + (dt.getUTCMonth() - now.getUTCMonth());
+    if (idx >= 0 && idx < 12) buckets[idx]++;
+  });
+  var max = Math.max.apply(null, buckets.concat([1]));
+  return '<div class="panel"><div class="panel-h"><h2>Renewal workload, next 12 months</h2>' +
+    '<span class="note">Capacity planning — where the pressure lands.</span></div><div class="panel-b">' +
+    '<div class="months">' + buckets.map(function (n, i) {
+      var col = i === 0 ? 'var(--crit)' : i < 3 ? 'var(--warn)' : 'var(--accent)';
+      return '<div class="mcol"><div class="cv">' + (n || '') + '</div>' +
+        '<div class="b" style="height:' + ((n / max) * 72).toFixed(0) + 'px;background:' + col + ';opacity:' + (n ? 1 : .25) + '"></div>' +
+        '<div class="lb">' + esc(labels[i]) + '</div></div>';
+    }).join('') + '</div></div></div>';
+}
+
+function criticalPanel() {
+  var rows = state.docs.map(function (d) { return { d: d, e: engine(d) }; })
+    .filter(function (r) { return r.e.active && r.e.days !== null && r.e.days <= 90; })
+    .sort(function (a, b) { return a.e.days - b.e.days; }).slice(0, 8);
+  if (!rows.length) return '';
+  return '<div class="panel"><div class="panel-h"><h2>Needs attention first</h2>' +
+    '<span class="note">Soonest expiry, top eight.</span></div>' +
+    '<div class="tw"><table><thead><tr><th>Document</th><th>Type</th><th>Expiry</th><th>Days</th><th>Status</th><th>Owner</th></tr></thead><tbody>' +
+    rows.map(function (r) { return docRow(r.d, r.e, true); }).join('') +
+    '</tbody></table></div></div>';
+}
+
+/* ── registry ──────────────────────────────────────── */
+var FILTERS = [
+  ['all', 'All active'], ['30', 'Expiring ≤30'], ['90', 'Expiring ≤90'],
+  ['expired', 'Expired'], ['mandatory', 'Mandatory'], ['renewal', 'Under renewal'],
+  ['pipeline', 'Draft / in approval'], ['archive', 'Archived']
+];
+function filtered() {
+  var q = state.q.trim().toLowerCase();
+  var out = state.docs.filter(function (d) {
+    var e = engine(d);
+    var away = !!PUT_AWAY[d.status];
+    if (state.filter === 'archive') { if (!away) return false; }
+    else if (away) return false;
+    if (state.filter === 'pipeline') {
+      if (d.status !== 'Draft' && d.status !== 'Pending Approval') return false;
+    }
+    if (state.filter === '30')        { if (!(e.days !== null && e.days >= 0 && e.days <= 30)) return false; }
+    if (state.filter === '90')        { if (!(e.days !== null && e.days >= 0 && e.days <= 90)) return false; }
+    if (state.filter === 'expired')   { if (e.status !== 'Expired') return false; }
+    if (state.filter === 'mandatory') { if (!isMandatory(d, state.types)) return false; }
+    if (state.filter === 'renewal')   { if (e.status !== 'Under Renewal') return false; }
+    if (q) {
+      var t = typeOf(d, state.types);
+      var hay = [d.name, d.nameEn, d.number, d.company, d.department, d.authority, d.owner, t && t.name].join(' ').toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+  var s = state.sort, dir = state.dir;
+  out.sort(function (a, b) {
+    var av, bv;
+    if (s === 'days') { av = engine(a).days; bv = engine(b).days;
+      if (av === null) return 1; if (bv === null) return -1; return (av - bv) * dir; }
+    av = String(a[s] || '').toLowerCase(); bv = String(b[s] || '').toLowerCase();
+    return av < bv ? -dir : av > bv ? dir : 0;
+  });
+  return out;
+}
+
+function viewRegistry() {
+  var rows = filtered();
+  var c = counts();
+  return head('Document registry',
+    rows.length + ' shown · ' + c.all + ' active · ' + c.pendingApprovals + ' in approval. Status recomputed just now.',
+    'سجل الوثائق') +
+    noteBanner() + sampleBanner() +
+    '<div class="bar">' +
+      '<input class="inp" type="search" id="q" placeholder="Search name, number, company, owner…" value="' + esc(state.q) + '">' +
+      '<div class="seg" id="filters">' + FILTERS.map(function (f) {
+        return '<button type="button" data-f="' + f[0] + '" class="' + (state.filter === f[0] ? 'on' : '') + '">' + esc(f[1]) + '</button>';
+      }).join('') + '</div>' +
+      '<button class="btn pri" id="btnAdd" type="button">+ Add document</button>' +
+      '<button class="btn" id="btnImport" type="button">Import CSV</button>' +
+      '<button class="btn" id="btnExport" type="button">Export CSV</button>' +
+      '<button class="btn" id="btnBackup" type="button">Save backup</button>' +
+      '<button class="btn" id="btnRestore" type="button">Restore backup</button>' +
+      '<input type="file" id="restoreFile" accept="application/json,.json" hidden>' +
+    '</div>' +
+    '<div class="panel"><div class="tw"><table><thead><tr>' +
+      '<th class="s" data-s="name">Document</th>' +
+      '<th>Type</th><th>Company</th>' +
+      '<th class="s" data-s="expiryDate">Expiry</th>' +
+      '<th class="s" data-s="days">Days to expire</th>' +
+      '<th>Status</th><th class="s" data-s="owner">Owner</th><th></th>' +
+    '</tr></thead><tbody>' +
+    (rows.length ? rows.map(function (d) { return docRow(d, engine(d), false); }).join('')
+      : '<tr><td colspan="8"><div class="empty">Nothing matches this filter.</div></td></tr>') +
+    '</tbody></table></div></div>';
+}
+
+function docRow(d, e, compact) {
+  var t = typeOf(d, state.types);
+  var mand = isMandatory(d, state.types);
+  var pct = e.days === null ? 0 : e.days < 0 ? 100 : Math.min(100, (e.days / 180) * 100);
+  var col = RISK_COLOR[e.risk];
+  var dayCell = e.days === null
+    ? '<span class="chip mute">no expiry</span>'
+    : '<div class="dbar"><span class="t"><i style="width:' + pct.toFixed(0) + '%;background:' + col + '"></i></span>' +
+      '<span class="n" style="color:' + col + ';font-weight:' + (e.days <= 30 ? 700 : 400) + '">' +
+      (e.days < 0 ? 'overdue ' + Math.abs(e.days) + 'd' : e.days + 'd') + '</span></div>';
+
+  return '<tr class="risk-' + e.risk + '">' +
+    '<td><div class="docname">' + esc(d.name || '(untitled)') + (mand ? ' <span class="chip crit" title="Mandatory">req</span>' : '') + '</div>' +
+      '<div class="docmeta">' + esc(d.number || '—') + (d.nameEn ? ' · ' + esc(d.nameEn) : '') + '</div></td>' +
+    '<td>' + esc(t ? t.name : '—') + '</td>' +
+    (compact ? '' : '<td>' + esc(d.company || '—') + '</td>') +
+    '<td class="num">' + fmtDate(d.expiryDate) + '</td>' +
+    '<td>' + dayCell + '</td>' +
+    '<td><span class="chip ' + (STATUS_CHIP[e.status] || 'mute') + '">' + esc(e.status) + '</span></td>' +
+    '<td>' + esc(d.owner || '<span style="color:var(--brass)">unassigned</span>') + '</td>' +
+    (compact ? '' : '<td style="white-space:nowrap">' +
+      '<button class="btn mini" data-edit="' + esc(d.id) + '" type="button">Edit</button> ' +
+      (d.status === 'Draft'
+        ? '<button class="btn mini" data-submit="' + esc(d.id) + '" type="button">Submit</button>' : '') +
+      (e.active && e.days !== null && e.days <= 120 && e.status !== 'Under Renewal' && d.status !== 'Draft' && d.status !== 'Pending Approval'
+        ? '<button class="btn mini" data-renew="' + esc(d.id) + '" type="button">Renew</button>' : '') +
+      '</td>') +
+    '</tr>';
+}
+
+/* ── alerts today ──────────────────────────────────── */
+function viewAlerts() {
+  var hits = [];
+  state.docs.forEach(function (d) {
+    var t = typeOf(d, state.types);
+    var tr = tierToday(d, t);
+    if (tr) hits.push({ d: d, t: t, tr: tr, e: engine(d) });
+  });
+  hits.sort(function (a, b) {
+    var av = a.tr.tier === 'overdue' ? -1 : a.tr.tier;
+    var bv = b.tr.tier === 'overdue' ? -1 : b.tr.tier;
+    return av - bv;
+  });
+
+  var body = hits.length ? hits.map(function (h) {
+    var lvlName = h.tr.level >= 3 ? 'Executive escalation' : h.tr.level === 2 ? 'Manager escalation' : 'Standard';
+    var lvlChip = h.tr.level >= 3 ? 'crit' : h.tr.level === 2 ? 'warn' : 'ok';
+    var rec = recipientsFor(h.d, h.tr.level);
+    return '<div class="alert-row">' +
+      '<div><div class="docname">' + esc(h.d.name) + '</div>' +
+        '<div class="docmeta">' + esc(h.d.number || '—') + ' · ' + esc(h.t ? h.t.name : '—') + '</div></div>' +
+      '<div><span class="chip ' + lvlChip + '">' +
+        (h.tr.tier === 'overdue' ? 'overdue · daily' : 'T-' + h.tr.tier) + '</span>' +
+        '<div class="docmeta" style="margin-top:4px">' + esc(lvlName) + '</div></div>' +
+      '<div><div class="ch">' + h.tr.channels.map(function (c) {
+          return '<span class="chip ' + (c === 'SMS' ? 'brass' : 'acc') + '">' + esc(c) + '</span>';
+        }).join('') + '</div>' +
+        '<div class="who" style="margin-top:5px">' +
+          (rec.length ? esc(rec.join(' · ')) : '<span style="color:var(--crit)">no recipients — owner unassigned</span>') +
+        '</div></div>' +
+      '</div>';
+  }).join('') : '<div class="empty">No document sits on a reminder tier today. That is the normal state.</div>';
+
+  return head('Alerts due today', 'What the notification flow would send if it ran right now.', 'تنبيهات اليوم') +
+    noteBanner() +
+    '<div class="banner"><span class="grow">Each document\'s ladder comes from its <b>policy type</b>, not from a fixed reminder date. ' +
+      'A tier fires only on the exact day it is reached — and once, guarded by an idempotency key.</span></div>' +
+    '<div class="panel"><div class="panel-h"><h2>' + hits.length + ' notification(s) queued</h2>' +
+      '<span class="note">SMS activates at T-7 and while overdue only.</span></div>' + body + '</div>';
+}
+
+/* ── policy types ──────────────────────────────────── */
+function viewTypes() {
+  return head('Policy types', 'Behaviour lives here, not in the flows. Change a row, change how the system behaves.', 'أنواع الوثائق') +
+    noteBanner() +
+    '<div class="bar"><button class="btn pri" id="btnAddType" type="button">+ Add type</button></div>' +
+    '<div class="panel"><div class="tw"><table><thead><tr>' +
+      '<th>Type</th><th>Validity</th><th>Mandatory</th><th>Reminder ladder (days)</th><th>Channels</th><th>Approval</th><th>Retention</th><th></th>' +
+    '</tr></thead><tbody>' +
+    (state.types.length ? state.types.map(function (t) {
+      var used = state.docs.filter(function (d) { return d.typeId === t.id; }).length;
+      return '<tr>' +
+        '<td><div class="docname">' + esc(t.name) + '</div><div class="docmeta" dir="rtl">' + esc(t.nameAr || '') + '</div>' +
+          '<div class="docmeta">' + used + ' document(s)</div></td>' +
+        '<td class="num">' + (t.months ? t.months + ' mo' : 'variable') + '</td>' +
+        '<td>' + (t.mandatory ? '<span class="chip crit">required</span>' : '<span class="chip mute">optional</span>') + '</td>' +
+        '<td class="num">' + esc((t.tiers || []).join(', ')) + '</td>' +
+        '<td>' + (t.channels || []).map(function (c) {
+            return '<span class="chip ' + (c === 'SMS' ? 'brass' : 'acc') + '">' + esc(c) + '</span> ';
+          }).join('') + '</td>' +
+        '<td style="font-size:12px">' + esc(t.approval || '—') + '</td>' +
+        '<td class="num">' + (t.retention ? t.retention + ' yr' : '—') + '</td>' +
+        '<td><button class="btn mini" data-etype="' + esc(t.id) + '" type="button">Edit</button></td>' +
+      '</tr>';
+    }).join('') : '<tr><td colspan="8"><div class="empty">No policy types yet.</div></td></tr>') +
+    '</tbody></table></div></div>';
+}
+
+/* ── audit ─────────────────────────────────────────── */
+function viewAudit() {
+  return head('Audit trail', 'Every change to the registry, newest first. Kept for the last 200 events.', 'سجل التدقيق') +
+    noteBanner() +
+    '<div class="panel">' + (state.audit.length ? state.audit.map(function (e) {
+      return '<div class="ev"><span class="t">' + esc(new Date(e.t).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })) + '</span>' +
+        '<span><span class="chip ' + (e.type === 'delete' ? 'crit' : e.type === 'create' ? 'ok' : 'acc') + '">' + esc(e.type) + '</span></span>' +
+        '<span><b>' + esc(e.entity) + '</b>' + (e.detail ? ' — ' + esc(e.detail) : '') + '</span></div>';
+    }).join('') : '<div class="empty">No events recorded yet.</div>') + '</div>';
+}
+
+/* ── shared bits ───────────────────────────────────── */
+function head(t, sub, ar) {
+  return '<div class="head"><div><h1>' + esc(t) + '</h1><div class="sub">' + esc(sub) + '</div></div>' +
+    '<div class="ar">' + esc(ar) + '</div></div>';
+}
+function tile(v, k, col) {
+  return '<div class="tile"><div class="v"' + (col ? ' style="color:' + col + '"' : '') + '>' + v + '</div><div class="k">' + esc(k) + '</div></div>';
+}
+function noteBanner() {
+  if (!state.note) return '';
+  return '<div class="banner warn"><span class="grow">' + esc(state.note) + '</span>' +
+    '<button type="button" id="noteX">Dismiss</button></div>';
+}
+function sampleBanner() {
+  var n = state.docs.filter(function (d) { return d.isSample; }).length;
+  if (!n) return '';
+  return '<div class="banner"><span class="grow"><b>' + n + ' example row(s)</b> are loaded so the app opens in a working state. ' +
+    'Import your own list, then clear them.</span><button type="button" id="btnClearSamples">Clear examples</button></div>';
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   4. MODALS
+   ══════════════════════════════════════════════════════════════════ */
+function closeModal() { $('modalHost').innerHTML = ''; }
+
+function docModal(id) {
+  var d = id ? state.docs.filter(function (x) { return x.id === id; })[0] : null;
+  var isNew = !d;
+  d = d || { id: uid(), status: 'Valid' };
+  var opts = state.types.map(function (t) {
+    return '<option value="' + esc(t.id) + '"' + (d.typeId === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>';
+  }).join('');
+  var stat = ['Draft', 'Pending Approval', 'Valid', 'Under Renewal', 'Archived', 'Superseded'].map(function (s) {
+    return '<option' + (d.status === s ? ' selected' : '') + '>' + s + '</option>';
+  }).join('');
+
+  $('modalHost').innerHTML =
+  '<div class="scrim" id="scrim"><div class="modal" role="dialog" aria-modal="true" aria-label="Document details">' +
+    '<div class="modal-h"><h3>' + (isNew ? 'Add document' : 'Edit document') + '</h3>' +
+      '<button class="x" id="mx" type="button" aria-label="Close">×</button></div>' +
+    '<div class="modal-b">' +
+      '<div class="grid2">' +
+        fld('f_name', 'Document name (AR)', 'text', d.name, 'required') +
+        fld('f_nameEn', 'Document name (EN)', 'text', d.nameEn) +
+        fld('f_number', 'Document number', 'text', d.number) +
+        '<div class="fld"><label for="f_type">Policy type</label><select id="f_type"><option value="">— none —</option>' + opts + '</select></div>' +
+        fld('f_company', 'Company / entity', 'text', d.company) +
+        fld('f_department', 'Department', 'text', d.department) +
+        fld('f_authority', 'Issuing authority', 'text', d.authority) +
+        fld('f_country', 'Country', 'text', d.country) +
+        fld('f_issue', 'Issue date', 'date', d.issueDate) +
+        fld('f_expiry', 'Expiry date', 'date', d.expiryDate, '', 'Leave blank for a document with no expiry.') +
+        fld('f_owner', 'Document owner', 'text', d.owner, '', 'Unassigned documents count as a governance gap.') +
+        fld('f_backup', 'Backup owner', 'text', d.backupOwner) +
+        fld('f_escal', 'Escalation manager', 'text', d.escalationMgr, '', 'Added at T-30.') +
+        fld('f_exec', 'Executive sponsor', 'text', d.execSponsor, '', 'Added at T-7.') +
+        fld('f_review', 'Last reviewed on', 'date', d.lastReviewed) +
+        fld('f_file', 'File link', 'url', d.fileUrl) +
+        '<div class="fld"><label for="f_status">Status</label><select id="f_status">' + stat + '</select>' +
+          '<span class="hint">Expiring / Expired are computed, never set by hand.</span></div>' +
+        '<div class="fld"><label for="f_mand">Mandatory override</label><select id="f_mand">' +
+          '<option value="">Inherit from type</option>' +
+          '<option value="yes"' + (d.mandatory === true ? ' selected' : '') + '>Yes — required by law</option>' +
+          '<option value="no"' + (d.mandatory === false ? ' selected' : '') + '>No</option></select></div>' +
+      '</div>' +
+      '<div class="fld"><label for="f_notes">Notes</label><textarea id="f_notes" rows="2">' + esc(d.notes || '') + '</textarea></div>' +
+      '<div class="err" id="mErr"></div>' +
+    '</div>' +
+    '<div class="modal-f">' +
+      (isNew ? '' : '<button class="btn danger" id="mDel" type="button">Delete</button>') +
+      '<button class="btn" id="mCancel" type="button">Cancel</button>' +
+      '<button class="btn pri" id="mSave" type="button">' + (isNew ? 'Add document' : 'Save changes') + '</button>' +
+    '</div>' +
+  '</div></div>';
+
+  $('mSave').onclick = function () {
+    var name = $('f_name').value.trim();
+    if (!name) { $('mErr').textContent = 'Document name is required.'; $('f_name').focus(); return; }
+    var mv = $('f_mand').value;
+    var next = {
+      id: d.id, name: name,
+      nameEn: $('f_nameEn').value.trim(), number: $('f_number').value.trim(),
+      typeId: $('f_type').value, company: $('f_company').value.trim(),
+      department: $('f_department').value.trim(), authority: $('f_authority').value.trim(),
+      country: $('f_country').value.trim(),
+      issueDate: $('f_issue').value, expiryDate: $('f_expiry').value,
+      owner: $('f_owner').value.trim(), backupOwner: $('f_backup').value.trim(),
+      escalationMgr: $('f_escal').value.trim(), execSponsor: $('f_exec').value.trim(),
+      lastReviewed: $('f_review').value, fileUrl: $('f_file').value.trim(),
+      status: $('f_status').value, notes: $('f_notes').value.trim(),
+      updated: new Date().toISOString()
+    };
+    if (mv === 'yes') next.mandatory = true;
+    else if (mv === 'no') next.mandatory = false;
+    saveDoc(next);
+    logEvent(isNew ? 'create' : 'update', name, isNew ? 'Registered' : 'Details edited');
+    closeModal();
+  };
+  if ($('mDel')) $('mDel').onclick = function () {
+    if (!confirmish('Delete "' + d.name + '"? The audit entry is kept.')) return;
+    removeDoc(d.id); logEvent('delete', d.name, 'Removed from the registry'); closeModal();
+  };
+  wireModal();
+  $('f_name').focus();
+}
+
+function renewModal(id) {
+  var d = state.docs.filter(function (x) { return x.id === id; })[0];
+  if (!d) return;
+  var t = typeOf(d, state.types);
+  var months = (t && t.months) || 12;
+  var base = parseDay(d.expiryDate) || todayUTC();
+  var suggested = new Date(base);
+  suggested.setUTCMonth(suggested.getUTCMonth() + months);
+  var iso = suggested.toISOString().slice(0, 10);
+
+  $('modalHost').innerHTML =
+  '<div class="scrim" id="scrim"><div class="modal" style="max-width:460px" role="dialog" aria-modal="true" aria-label="Start renewal">' +
+    '<div class="modal-h"><h3>Renew document</h3><button class="x" id="mx" type="button" aria-label="Close">×</button></div>' +
+    '<div class="modal-b">' +
+      '<div><b>' + esc(d.name) + '</b><div class="docmeta">' + esc(d.number || '—') + ' · expires ' + fmtDate(d.expiryDate) + '</div></div>' +
+      '<div class="fld"><label for="r_stage">Stage</label><select id="r_stage">' +
+        ['Initiated','Documents Gathering','Submitted to Authority','Received','Registered'].map(function (s) {
+          return '<option>' + s + '</option>'; }).join('') + '</select>' +
+        '<span class="hint">Registered closes the renewal and writes the new expiry date.</span></div>' +
+      fld('r_expiry', 'New expiry date', 'date', iso, '', 'Suggested from the type\'s ' + months + '-month validity.') +
+      '<div class="err" id="mErr"></div>' +
+    '</div>' +
+    '<div class="modal-f"><button class="btn" id="mCancel" type="button">Cancel</button>' +
+      '<button class="btn pri" id="mSave" type="button">Apply</button></div>' +
+  '</div></div>';
+
+  $('mSave').onclick = function () {
+    var stage = $('r_stage').value, nd = $('r_expiry').value;
+    var next = {};
+    for (var k in d) if (Object.prototype.hasOwnProperty.call(d, k)) next[k] = d[k];
+    if (stage === 'Registered') {
+      if (!nd) { $('mErr').textContent = 'A new expiry date is required to register the renewal.'; return; }
+      next.expiryDate = nd; next.status = 'Valid';
+      next.lastRenewed = new Date().toISOString().slice(0, 10);
+      next.lastReviewed = new Date().toISOString().slice(0, 10);
+      logEvent('renewal', d.name, 'Registered — new expiry ' + fmtDate(nd));
+    } else {
+      next.status = 'Under Renewal';
+      next.renewalStage = stage;
+      logEvent('renewal', d.name, 'Stage set to ' + stage);
+    }
+    next.updated = new Date().toISOString();
+    saveDoc(next);
+    closeModal();
+  };
+  wireModal();
+}
+
+function typeModal(id) {
+  var t = id ? state.types.filter(function (x) { return x.id === id; })[0] : null;
+  var isNew = !t;
+  t = t || { id: uid(), tiers: [90, 60, 30, 14, 7, 1], channels: ['Email', 'Teams'], months: 12, retention: 7 };
+  var ch = ['Email', 'Teams', 'SMS', 'InApp'];
+
+  $('modalHost').innerHTML =
+  '<div class="scrim" id="scrim"><div class="modal" style="max-width:520px" role="dialog" aria-modal="true" aria-label="Policy type">' +
+    '<div class="modal-h"><h3>' + (isNew ? 'Add policy type' : 'Edit policy type') + '</h3>' +
+      '<button class="x" id="mx" type="button" aria-label="Close">×</button></div>' +
+    '<div class="modal-b">' +
+      '<div class="grid2">' +
+        fld('t_name', 'Type name (EN)', 'text', t.name, 'required') +
+        fld('t_nameAr', 'Type name (AR)', 'text', t.nameAr) +
+        fld('t_months', 'Validity (months)', 'number', t.months, '', '0 = variable') +
+        fld('t_ret', 'Retention (years)', 'number', t.retention) +
+      '</div>' +
+      fld('t_tiers', 'Reminder ladder', 'text', (t.tiers || []).join(', '), '', 'Days before expiry, comma separated. This is the escalation schedule.') +
+      '<div class="fld"><label>Channels</label><div style="display:flex;gap:12px;flex-wrap:wrap">' +
+        ch.map(function (c) {
+          return '<label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="t_ch_' + c + '"' +
+            ((t.channels || []).indexOf(c) > -1 ? ' checked' : '') + '> ' + c + '</label>';
+        }).join('') + '</div><span class="hint">SMS only ever fires at T-7 and below.</span></div>' +
+      '<div class="grid2">' +
+        '<div class="fld"><label for="t_mand">Mandatory</label><select id="t_mand">' +
+          '<option value="no"' + (!t.mandatory ? ' selected' : '') + '>Optional</option>' +
+          '<option value="yes"' + (t.mandatory ? ' selected' : '') + '>Required by law</option></select></div>' +
+        '<div class="fld"><label for="t_appr">Approval chain</label><select id="t_appr">' +
+          ['Owner Only','Owner + Compliance','Owner + Compliance + Legal','Executive'].map(function (a) {
+            return '<option' + (t.approval === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') +
+        '</select></div>' +
+      '</div>' +
+      '<div class="err" id="mErr"></div>' +
+    '</div>' +
+    '<div class="modal-f"><button class="btn" id="mCancel" type="button">Cancel</button>' +
+      '<button class="btn pri" id="mSave" type="button">' + (isNew ? 'Add type' : 'Save') + '</button></div>' +
+  '</div></div>';
+
+  $('mSave').onclick = function () {
+    var name = $('t_name').value.trim();
+    if (!name) { $('mErr').textContent = 'Type name is required.'; return; }
+    var tiers = $('t_tiers').value.split(',').map(function (x) { return parseInt(x.trim(), 10); })
+      .filter(function (x) { return !isNaN(x) && x >= 0; })
+      .sort(function (a, b) { return b - a; });
+    var chans = ch.filter(function (c) { return $('t_ch_' + c).checked; });
+    saveType({
+      id: t.id, name: name, nameAr: $('t_nameAr').value.trim(),
+      months: parseInt($('t_months').value, 10) || 0,
+      retention: parseInt($('t_ret').value, 10) || 0,
+      tiers: tiers, channels: chans,
+      mandatory: $('t_mand').value === 'yes',
+      approval: $('t_appr').value
+    });
+    logEvent(isNew ? 'create' : 'update', 'Policy type: ' + name, 'Ladder ' + tiers.join('/'));
+    closeModal();
+  };
+  wireModal();
+}
+
+function decideModal(apId, outcome) {
+  var ap = state.approvals.filter(function (a) { return a.id === apId; })[0];
+  if (!ap) return;
+  var step = currentStep(ap);
+  if (!step) return;
+  var deleg = delegateOf(step.approver, docDept(ap.docId));
+  var actors = [step.approver].concat(deleg ? [deleg] : []).filter(Boolean);
+  var reject = outcome === 'Rejected';
+
+  $('modalHost').innerHTML =
+  '<div class="scrim" id="scrim"><div class="modal" style="max-width:500px" role="dialog" aria-modal="true" aria-label="Approval decision">' +
+    '<div class="modal-h"><h3>' + (reject ? 'Reject' : 'Approve') + ' — step ' + step.order + '</h3>' +
+      '<button class="x" id="mx" type="button" aria-label="Close">×</button></div>' +
+    '<div class="modal-b">' +
+      '<div><b>' + esc(ap.docName) + '</b><div class="docmeta">' + esc(step.role) +
+        ' · chain ' + esc(ap.template) + '</div></div>' +
+      (actors.length
+        ? '<div class="fld"><label for="a_actor">Acting as</label><select id="a_actor">' +
+            actors.map(function (a, i) {
+              return '<option value="' + esc(a) + '">' + esc(a) + (i > 0 ? ' (delegate)' : '') + '</option>';
+            }).join('') + '</select>' +
+            (deleg ? '<span class="hint">A delegate may act, and the record shows who actually did.</span>' : '') +
+          '</div>'
+        : '<div class="banner warn" style="margin:0"><span class="grow">No approver is named for this role. ' +
+          'Set one on the document or in Standing approvers first.</span></div>') +
+      '<div class="fld"><label for="a_comment">Comment' + (reject ? ' (required)' : '') + '</label>' +
+        '<textarea id="a_comment" rows="3" placeholder="' +
+          (reject ? 'Why is this being rejected? The submitter sees this.' : 'Optional note recorded with the decision.') +
+        '"></textarea></div>' +
+      (reject ? '<div class="banner crit" style="margin:0"><span class="grow">Rejecting ends the chain. ' +
+        'The document returns to Draft and later steps are never created.</span></div>' : '') +
+      '<div class="err" id="mErr"></div>' +
+    '</div>' +
+    '<div class="modal-f"><button class="btn" id="mCancel" type="button">Cancel</button>' +
+      '<button class="btn ' + (reject ? 'danger' : 'pri') + '" id="mSave" type="button">' +
+        (reject ? 'Reject and return to draft' : 'Approve') + '</button></div>' +
+  '</div></div>';
+
+  $('mSave').onclick = function () {
+    var c = $('a_comment').value.trim();
+    if (reject && !c) { $('mErr').textContent = 'A reason is required when rejecting.'; return; }
+    if (!actors.length) { $('mErr').textContent = 'Name an approver for this role first.'; return; }
+    decideStep(apId, outcome, c, $('a_actor').value);
+    closeModal();
+  };
+  wireModal();
+}
+
+function delegModal() {
+  var people = [];
+  state.docs.forEach(function (d) {
+    ['owner', 'backupOwner', 'escalationMgr', 'execSponsor'].forEach(function (k) {
+      if (d[k] && people.indexOf(d[k]) === -1) people.push(d[k]);
+    });
+  });
+  [state.settings.complianceOfficer, state.settings.legalApprover].forEach(function (p) {
+    if (p && people.indexOf(p) === -1) people.push(p);
+  });
+  people.sort();
+  var depts = [];
+  state.docs.forEach(function (d) { if (d.department && depts.indexOf(d.department) === -1) depts.push(d.department); });
+  depts.sort();
+
+  var today = new Date().toISOString().slice(0, 10);
+  var plus14 = new Date(todayUTC() + 14 * DAY).toISOString().slice(0, 10);
+  var opts = function (id, list, hint) {
+    return '<div class="fld"><label for="' + id + '">' + hint + '</label>' +
+      '<input id="' + id + '" list="' + id + '_l" placeholder="name or email">' +
+      '<datalist id="' + id + '_l">' + list.map(function (p) { return '<option value="' + esc(p) + '">'; }).join('') + '</datalist></div>';
+  };
+
+  $('modalHost').innerHTML =
+  '<div class="scrim" id="scrim"><div class="modal" style="max-width:540px" role="dialog" aria-modal="true" aria-label="New delegation">' +
+    '<div class="modal-h"><h3>New delegation</h3><button class="x" id="mx" type="button" aria-label="Close">×</button></div>' +
+    '<div class="modal-b">' +
+      '<div class="grid2">' +
+        opts('d_from', people, 'Delegator — who is away') +
+        opts('d_to', people, 'Delegate — who covers') +
+      '</div>' +
+      '<div class="grid2">' +
+        fld('d_start', 'Valid from', 'date', today) +
+        fld('d_end', 'Valid until', 'date', plus14, '', 'Expires automatically on this date.') +
+      '</div>' +
+      '<div class="fld"><label for="d_scope">Scope</label><select id="d_scope">' +
+        '<option value="">All departments</option>' +
+        depts.map(function (x) { return '<option value="' + esc(x) + '">' + esc(x) + '</option>'; }).join('') +
+      '</select><span class="hint">Narrow the scope where you can. Broad cover is harder to audit.</span></div>' +
+      fld('d_reason', 'Reason', 'text', '', '', 'Annual leave, travel, medical leave, secondment…') +
+      '<div class="err" id="mErr"></div>' +
+    '</div>' +
+    '<div class="modal-f"><button class="btn" id="mCancel" type="button">Cancel</button>' +
+      '<button class="btn pri" id="mSave" type="button">Create delegation</button></div>' +
+  '</div></div>';
+
+  $('mSave').onclick = function () {
+    var from = $('d_from').value.trim(), to = $('d_to').value.trim();
+    var s = $('d_start').value, e = $('d_end').value;
+    if (!from || !to) { $('mErr').textContent = 'Both delegator and delegate are required.'; return; }
+    if (from === to)  { $('mErr').textContent = 'A person cannot delegate to themselves.'; return; }
+    if (!s || !e)     { $('mErr').textContent = 'Both dates are required.'; return; }
+    if (parseDay(e) < parseDay(s)) { $('mErr').textContent = 'The end date is before the start date.'; return; }
+    state.delegations.unshift({
+      id: uid(), delegator: from, delegate: to,
+      scopeDept: $('d_scope').value, validFrom: s, validUntil: e,
+      reason: $('d_reason').value.trim(), revoked: false,
+      createdAt: new Date().toISOString()
+    });
+    logEvent('delegation', from + ' → ' + to,
+      'Valid ' + s + ' to ' + e + ($('d_scope').value ? ' · ' + $('d_scope').value : ' · all departments'));
+    afterWrite();
+    closeModal();
+    render();
+  };
+  wireModal();
+  $('d_from').focus();
+}
+
+function importModal() {
+  $('modalHost').innerHTML =
+  '<div class="scrim" id="scrim"><div class="modal" role="dialog" aria-modal="true" aria-label="Import CSV">' +
+    '<div class="modal-h"><h3>Import from CSV</h3><button class="x" id="mx" type="button" aria-label="Close">×</button></div>' +
+    '<div class="modal-b">' +
+      '<p style="margin:0;font-size:13px;color:var(--ink-2)">Export your SharePoint list to CSV and paste it below. ' +
+      'The first row must be the header. Recognised columns:</p>' +
+      '<div class="docmeta" style="line-height:1.7">Document Name · Document Number · Document Type · Company · Department · ' +
+        'Issuing Authority · Country · Issue Date · Expiry Date · Dep. Owner · Notes · Mandatory</div>' +
+      '<div class="fld"><label for="csv">CSV content</label>' +
+        '<textarea id="csv" rows="9" placeholder="Document Name,Document Number,Expiry Date,..."></textarea>' +
+        '<span class="hint">Dates are read as dd/mm/yyyy or yyyy-mm-dd. Rows with no name are skipped.</span></div>' +
+      '<div class="err" id="mErr"></div>' +
+    '</div>' +
+    '<div class="modal-f"><button class="btn" id="mCancel" type="button">Cancel</button>' +
+      '<button class="btn pri" id="mSave" type="button">Import</button></div>' +
+  '</div></div>';
+
+  $('mSave').onclick = function () {
+    var res = parseCSV($('csv').value);
+    if (res.error) { $('mErr').textContent = res.error; return; }
+    if (!res.rows.length) { $('mErr').textContent = 'No usable rows found.'; return; }
+    res.rows.forEach(function (r) { saveDoc(r); });
+    logEvent('import', 'CSV import', res.rows.length + ' row(s) imported, ' + res.skipped + ' skipped');
+    state.note = 'Imported ' + res.rows.length + ' row(s). ' + (res.skipped ? res.skipped + ' row(s) skipped (no document name). ' : '') +
+      (res.badDates ? res.badDates + ' date(s) could not be read and were left blank.' : '');
+    closeModal();
+    render();
+  };
+  wireModal();
+}
+
+function wireModal() {
+  $('mx').onclick = closeModal;
+  $('mCancel').onclick = closeModal;
+  $('scrim').addEventListener('mousedown', function (e) { if (e.target.id === 'scrim') closeModal(); });
+  document.addEventListener('keydown', escClose);
+}
+function escClose(e) {
+  if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escClose); }
+}
+function fld(id, label, type, val, req, hint) {
+  return '<div class="fld"><label for="' + id + '">' + esc(label) + '</label>' +
+    '<input id="' + id + '" type="' + type + '" value="' + esc(val == null ? '' : val) + '"' + (req ? ' required' : '') + '>' +
+    (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '</div>';
+}
+function confirmish(msg) { return window.confirm(msg); }
+
+/* ══════════════════════════════════════════════════════════════════
+   5. CSV
+   ══════════════════════════════════════════════════════════════════ */
+function splitCSVLine(line) {
+  var out = [], cur = '', q = false;
+  for (var i = 0; i < line.length; i++) {
+    var c = line[i];
+    if (q) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') q = false;
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out.map(function (s) { return s.trim(); });
+}
+function normDate(raw) {
+  if (!raw) return { v: '', bad: false };
+  var s = String(raw).trim();
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+  if (m) return { v: m[1] + '-' + pad(m[2]) + '-' + pad(m[3]), bad: false };
+  m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(s);
+  if (m) return { v: m[3] + '-' + pad(m[2]) + '-' + pad(m[1]), bad: false };
+  return { v: '', bad: true };
+}
+function pad(n) { return String(n).length < 2 ? '0' + n : String(n); }
+
+var CSV_MAP = {
+  'document name': 'name', 'name': 'name', 'title': 'name',
+  'document name (en)': 'nameEn', 'english name': 'nameEn',
+  'document number': 'number', 'number': 'number', 'document nu...': 'number',
+  'document type': '_type', 'type': '_type',
+  'company': 'company', 'department': 'department',
+  'issuing authority': 'authority', 'authority': 'authority',
+  'country': 'country', 'countri': 'country',
+  'issue date': 'issueDate', 'expiry date': 'expiryDate',
+  'dep. owner': 'owner', 'dep owner': 'owner', 'owner': 'owner', 'document owner': 'owner',
+  'notes': 'notes', 'mandatory': '_mand', 'mandatory?': '_mand', 'mantadory?': '_mand',
+  'reminder date': '_ignore', 'days to expire': '_ignore', 'status': '_status'
+};
+
+function parseCSV(text) {
+  var lines = String(text).replace(/\r/g, '').split('\n').filter(function (l) { return l.trim() !== ''; });
+  if (lines.length < 2) return { error: 'Need a header row and at least one data row.', rows: [] };
+  var headers = splitCSVLine(lines[0]).map(function (h) { return h.toLowerCase().replace(/^"|"$/g, ''); });
+  var rows = [], skipped = 0, badDates = 0;
+
+  for (var i = 1; i < lines.length; i++) {
+    var cells = splitCSVLine(lines[i]);
+    var rec = { id: uid(), status: 'Valid' }, typeName = '';
+    headers.forEach(function (h, j) {
+      var key = CSV_MAP[h];
+      var val = cells[j] == null ? '' : cells[j];
+      if (!key || key === '_ignore') return;
+      if (key === '_type') { typeName = val; return; }
+      if (key === '_mand') { if (/^(yes|true|1|نعم)$/i.test(val)) rec.mandatory = true; else if (val) rec.mandatory = false; return; }
+      if (key === '_status') { if (['Draft','Pending Approval','Valid','Under Renewal','Archived','Superseded'].indexOf(val) > -1) rec.status = val; return; }
+      if (key === 'issueDate' || key === 'expiryDate') {
+        var d = normDate(val);
+        if (d.bad) badDates++;
+        rec[key] = d.v;
+        return;
+      }
+      rec[key] = val;
+    });
+    if (!rec.name) { skipped++; continue; }
+    if (typeName) {
+      var match = state.types.filter(function (t) {
+        return t.name.toLowerCase() === typeName.toLowerCase() || (t.nameAr && t.nameAr === typeName);
+      })[0];
+      rec.typeId = match ? match.id : '';
+      if (!match) rec.notes = (rec.notes ? rec.notes + ' · ' : '') + 'Unmapped type: ' + typeName;
+    }
+    rows.push(rec);
+  }
+  return { rows: rows, skipped: skipped, badDates: badDates };
+}
+
+function exportCSV() {
+  var cols = ['name','nameEn','number','company','department','authority','country',
+              'issueDate','expiryDate','owner','backupOwner','status','notes'];
+  var head = ['Document Name','Document Name (EN)','Document Number','Company','Department',
+              'Issuing Authority','Country','Issue Date','Expiry Date','Document Owner',
+              'Backup Owner','Status','Notes','Type','Days To Expire','Risk Band'];
+  var lines = [head.map(q).join(',')];
+  filtered().forEach(function (d) {
+    var e = engine(d), t = typeOf(d, state.types);
+    var row = cols.map(function (c) { return q(d[c] == null ? '' : d[c]); });
+    row.push(q(t ? t.name : ''), q(e.days === null ? '' : e.days), q(e.risk));
+    lines.push(row.join(','));
+  });
+  var csv = lines.join('\n');
+  navigator.clipboard && navigator.clipboard.writeText(csv).then(function () {
+    state.note = 'Exported ' + (lines.length - 1) + ' row(s) to your clipboard as CSV — paste into Excel.';
+    render();
+  }, function () { showCSV(csv); });
+  if (!navigator.clipboard) showCSV(csv);
+}
+function q(v) { var s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function showCSV(csv) {
+  $('modalHost').innerHTML =
+  '<div class="scrim" id="scrim"><div class="modal" role="dialog" aria-modal="true" aria-label="CSV export">' +
+    '<div class="modal-h"><h3>Copy this CSV</h3><button class="x" id="mx" type="button" aria-label="Close">×</button></div>' +
+    '<div class="modal-b"><textarea rows="12" id="csvOut"></textarea></div>' +
+    '<div class="modal-f"><button class="btn" id="mCancel" type="button">Close</button>' +
+      '<button class="btn pri" id="mSave" type="button">Select all</button></div>' +
+  '</div></div>';
+  $('csvOut').value = csv;
+  $('mSave').onclick = function () { $('csvOut').select(); };
+  wireModal();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   6. EVENTS
+   ══════════════════════════════════════════════════════════════════ */
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-view],[data-f],[data-s],[data-edit],[data-renew],[data-etype],[data-submit],[data-decide],[data-revoke],[data-deldeleg],button') : null;
+  if (!t) return;
+  if (t.dataset && t.dataset.submit) {
+    var sd = state.docs.filter(function (x) { return x.id === t.dataset.submit; })[0];
+    if (sd) { startApproval(sd); render(); }
+    return;
+  }
+  if (t.dataset && t.dataset.decide) { decideModal(t.dataset.decide, t.dataset.out); return; }
+  if (t.dataset && t.dataset.revoke) {
+    var rd = state.delegations.filter(function (x) { return x.id === t.dataset.revoke; })[0];
+    if (rd && confirmish('Revoke the delegation from ' + rd.delegator + ' to ' + rd.delegate + '?')) {
+      rd.revoked = true;
+      logEvent('delegation', rd.delegator + ' → ' + rd.delegate, 'Revoked early');
+      afterWrite(); render();
+    }
+    return;
+  }
+  if (t.dataset && t.dataset.deldeleg) {
+    if (!confirmish('Delete this delegation record? The audit entry is kept.')) return;
+    state.delegations = state.delegations.filter(function (x) { return x.id !== t.dataset.deldeleg; });
+    afterWrite(); render();
+    return;
+  }
+  if (t.dataset && t.dataset.view)   { state.view = t.dataset.view; render(); return; }
+  if (t.dataset && t.dataset.f)      { state.filter = t.dataset.f; render(); return; }
+  if (t.dataset && t.dataset.s)      {
+    var s = t.dataset.s;
+    state.dir = state.sort === s ? -state.dir : 1;
+    state.sort = s; render(); return;
+  }
+  if (t.dataset && t.dataset.edit)   { docModal(t.dataset.edit); return; }
+  if (t.dataset && t.dataset.renew)  { renewModal(t.dataset.renew); return; }
+  if (t.dataset && t.dataset.etype)  { typeModal(t.dataset.etype); return; }
+
+  switch (t.id) {
+    case 'btnAdd':      docModal(null); break;
+    case 'btnAddType':  typeModal(null); break;
+    case 'btnImport':   importModal(); break;
+    case 'btnExport':   exportCSV(); break;
+    case 'btnBackup':   exportJSON(); break;
+    case 'btnRestore':  $('restoreFile').click(); break;
+    case 'btnAddDeleg': delegModal(); break;
+    case 'btnSaveSettings':
+      state.settings.complianceOfficer = $('setCompliance').value.trim();
+      state.settings.legalApprover     = $('setLegal').value.trim();
+      logEvent('update', 'Standing approvers', 'Compliance and legal approvers set');
+      afterWrite();
+      state.note = 'Standing approvers saved. New chains will use them.';
+      render();
+      break;
+    case 'noteX':       state.note = ''; render(); break;
+    case 'btnTheme':    toggleTheme(); break;
+    case 'btnClearSamples':
+      if (!confirmish('Remove all example rows? Your own imported rows are kept.')) break;
+      state.docs.filter(function (d) { return d.isSample; }).forEach(function (d) { removeDoc(d.id); });
+      logEvent('delete', 'Example rows', 'Cleared');
+      break;
+  }
+});
+document.addEventListener('change', function (ev) {
+  if (ev.target.id === 'restoreFile' && ev.target.files && ev.target.files[0]) {
+    importJSON(ev.target.files[0]);
+    ev.target.value = '';
+  }
+});
+document.addEventListener('input', function (ev) {
+  if (ev.target.id === 'q') {
+    state.q = ev.target.value;
+    var pos = ev.target.selectionStart;
+    render();
+    var n = $('q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+  }
+});
+function toggleTheme() {
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : cur === 'light' ? 'dark'
+    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark');
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('edms-theme', next); } catch (e) {}
+}
+try {
+  var saved = localStorage.getItem('edms-theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+} catch (e) {}
+
+/* ══════════════════════════════════════════════════════════════════
+   7. BOOT
+   ══════════════════════════════════════════════════════════════════ */
+(function boot() {
+  var had = load();
+  if (!had) {
+    state.types = SEED_TYPES.slice();
+    state.docs = seedDocs();
+    state.settings = { complianceOfficer: 'Compliance Officer', legalApprover: 'Legal Counsel' };
+    state.delegations = [{
+      id: 'exd1', delegator: 'HR Officer', delegate: 'HR Specialist',
+      scopeDept: 'Human Resources',
+      validFrom: new Date(todayUTC() - 2 * DAY).toISOString().slice(0, 10),
+      validUntil: new Date(todayUTC() + 12 * DAY).toISOString().slice(0, 10),
+      reason: 'Example — annual leave cover', revoked: false,
+      createdAt: new Date().toISOString(), isSample: true
+    }];
+    logEvent('create', 'First run', 'Seeded 10 policy types, 6 example rows and 1 example delegation');
+    persist();
+  }
+  if (!state.types.length) { state.types = SEED_TYPES.slice(); persist(); }
+  if (!STORAGE_OK) {
+    state.note = 'This browser is blocking local storage, so nothing will be saved when you close the tab. ' +
+                 'Work anyway and export a JSON backup before closing.';
+  }
+  state.ready = true;
+  render();
+})();
+
+/* ── backup / restore: a real file on the user's disk ─────────────── */
+function exportJSON() {
+  var payload = {
+    format: 'EDMS-local-backup', version: 2,
+    exportedAt: new Date().toISOString(),
+    types: state.types, documents: state.docs, audit: state.audit,
+    approvals: state.approvals, delegations: state.delegations, settings: state.settings
+  };
+  downloadFile('edms-backup-' + new Date().toISOString().slice(0, 10) + '.json',
+    JSON.stringify(payload, null, 2), 'application/json');
+  state.note = 'Backup saved to your Downloads folder. Keep it somewhere the IT backup covers.';
+  render();
+}
+function downloadFile(filename, text, mime) {
+  try {
+    var blob = new Blob([text], { type: mime + ';charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+  } catch (e) {
+    state.note = 'Your browser blocked the download. Use Export CSV and paste into Excel instead.';
+    render();
+  }
+}
+function importJSON(file) {
+  var r = new FileReader();
+  r.onload = function () {
+    var o;
+    try { o = JSON.parse(r.result); }
+    catch (e) { state.note = 'That file is not valid JSON.'; render(); return; }
+    if (!o || o.format !== 'EDMS-local-backup') {
+      state.note = 'That file is not an EDMS backup.'; render(); return;
+    }
+    if (!confirmish('Restore this backup? It replaces everything currently in the app — ' +
+        (o.documents || []).length + ' document(s), ' + (o.types || []).length + ' type(s), ' +
+        (o.approvals || []).length + ' approval(s), ' + (o.delegations || []).length + ' delegation(s).')) return;
+    state.types       = Array.isArray(o.types) ? o.types : [];
+    state.docs        = Array.isArray(o.documents) ? o.documents : [];
+    state.audit       = Array.isArray(o.audit) ? o.audit : [];
+    state.approvals   = Array.isArray(o.approvals) ? o.approvals : [];
+    state.delegations = Array.isArray(o.delegations) ? o.delegations : [];
+    state.settings    = (o.settings && typeof o.settings === 'object')
+                      ? o.settings : { complianceOfficer: '', legalApprover: '' };
+    logEvent('import', 'Backup restored', 'From ' + (o.exportedAt || 'unknown date') +
+      ' · ' + state.approvals.length + ' approval(s), ' + state.delegations.length + ' delegation(s)');
+    persist();
+    state.note = 'Restored ' + state.docs.length + ' document(s).';
+    render();
+  };
+  r.readAsText(file);
+}
+})();
+</script>
+
+</body>
+</html>

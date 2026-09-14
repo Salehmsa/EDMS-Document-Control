@@ -1,0 +1,6 @@
+# migration and provisioning run artefacts — may contain real data
+*-Exceptions-*.csv
+EDMS-Provision-*.csv
+edms-backup-*.json
+.DS_Store
+Thumbs.db
