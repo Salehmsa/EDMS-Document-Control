@@ -1,0 +1,281 @@
+// ============================================================================
+// EDMS — Power BI semantic model : DAX measures
+// Model: Import mode, daily refresh at 07:30 Asia/Riyadh (after Flow 01)
+// Tables: fDocuments (registry), fRenewals, fNotifications, fAudit,
+//         dDate (marked as date table), dDocType, dDepartment, dCompany
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 0. DATE TABLE — Hijri-aware, KSA work week (Sun–Thu)
+// ----------------------------------------------------------------------------
+dDate =
+VAR _min = MIN ( fDocuments[IssueDate] )
+VAR _max = MAX ( MAX ( fDocuments[ExpiryDate] ), TODAY () + 730 )
+RETURN
+ADDCOLUMNS (
+    CALENDAR ( _min, _max ),
+    "Year",        YEAR ( [Date] ),
+    "MonthNo",     MONTH ( [Date] ),
+    "MonthName",   FORMAT ( [Date], "MMM" ),
+    "YearMonth",   FORMAT ( [Date], "YYYY-MM" ),
+    "Quarter",     "Q" & QUARTER ( [Date] ),
+    "WeekdayNo",   WEEKDAY ( [Date], 1 ),
+    "IsWorkday",   NOT WEEKDAY ( [Date], 1 ) IN { 6, 7 },   // Fri=6, Sat=7 in KSA
+    "IsPast",      [Date] <= TODAY ()
+)
+
+// ============================================================================
+// 1. CORE COUNTS
+// ============================================================================
+
+Total Documents = COUNTROWS ( fDocuments )
+
+Active Documents =
+CALCULATE (
+    [Total Documents],
+    NOT fDocuments[DocStatus] IN { "Archived", "Superseded", "Draft" }
+)
+
+Mandatory Documents =
+CALCULATE ( [Active Documents], fDocuments[IsMandatoryDoc] = TRUE () )
+
+// ----------------------------------------------------------------------------
+// Days-to-expire is recomputed in DAX rather than trusting the stamped column,
+// so the report is correct even if the nightly flow missed a run. The stamped
+// column drives SharePoint views; this measure drives the executive dashboard.
+// Disagreement between the two is itself a monitored signal — see [Flow Health].
+// ----------------------------------------------------------------------------
+Documents Expired =
+CALCULATE (
+    [Active Documents],
+    FILTER ( fDocuments, fDocuments[ExpiryDate] < TODAY () && NOT ISBLANK ( fDocuments[ExpiryDate] ) )
+)
+
+Documents Expiring 30d =
+CALCULATE (
+    [Active Documents],
+    FILTER (
+        fDocuments,
+        fDocuments[ExpiryDate] >= TODAY ()
+            && fDocuments[ExpiryDate] <= TODAY () + 30
+    )
+)
+
+Documents Expiring 90d =
+CALCULATE (
+    [Active Documents],
+    FILTER (
+        fDocuments,
+        fDocuments[ExpiryDate] >= TODAY ()
+            && fDocuments[ExpiryDate] <= TODAY () + 90
+    )
+)
+
+// ============================================================================
+// 2. THE HEADLINE KPI — Compliance Health Score
+// A single 0–100 number the executive committee can be held to.
+// Weighted so that a lapsed MANDATORY document hurts ~3× a lapsed optional one.
+// ============================================================================
+
+Compliance Health Score =
+VAR _total       = [Active Documents]
+VAR _expMand     = CALCULATE ( [Documents Expired],      fDocuments[IsMandatoryDoc] = TRUE () )
+VAR _expOpt      = CALCULATE ( [Documents Expired],      fDocuments[IsMandatoryDoc] = FALSE () )
+VAR _soonMand    = CALCULATE ( [Documents Expiring 30d], fDocuments[IsMandatoryDoc] = TRUE () )
+VAR _unowned     = [Documents Without Owner]
+VAR _stale       = [Documents Not Reviewed 12m]
+VAR _penalty     = ( _expMand * 6 ) + ( _expOpt * 2 ) + ( _soonMand * 1 ) + ( _unowned * 2 ) + ( _stale * 1 )
+VAR _score       = 100 - DIVIDE ( _penalty, _total * 6 ) * 100
+RETURN
+    IF ( _total = 0, BLANK (), MAX ( 0, ROUND ( _score, 0 ) ) )
+
+Health Score Band =
+SWITCH (
+    TRUE (),
+    [Compliance Health Score] >= 95, "Excellent",
+    [Compliance Health Score] >= 85, "Good",
+    [Compliance Health Score] >= 70, "At Risk",
+    "Critical"
+)
+
+Health Score Colour =
+SWITCH (
+    [Health Score Band],
+    "Excellent", "#107C10",
+    "Good",      "#498205",
+    "At Risk",   "#F7A700",
+    "#A4262C"
+)
+
+// ============================================================================
+// 3. GOVERNANCE GAP MEASURES
+// These surface the problems nobody reports because nobody owns them.
+// ============================================================================
+
+Documents Without Owner =
+CALCULATE ( [Active Documents], ISBLANK ( fDocuments[DocumentOwner] ) )
+
+Documents Not Reviewed 12m =
+CALCULATE (
+    [Active Documents],
+    FILTER (
+        fDocuments,
+        ISBLANK ( fDocuments[LastReviewedOn] )
+            || fDocuments[LastReviewedOn] < TODAY () - 365
+    )
+)
+
+Documents Missing File =
+CALCULATE ( [Active Documents], ISBLANK ( fDocuments[PrimaryFileUrl] ) )
+
+Governance Gap Count =
+    [Documents Without Owner] + [Documents Not Reviewed 12m] + [Documents Missing File]
+
+// Mandatory document types a company is REQUIRED to hold but does not.
+// This is the measure that catches the document nobody knew was missing —
+// it cannot come from the registry alone, because the row does not exist.
+Missing Mandatory Coverage =
+VAR _requiredPairs =
+    FILTER (
+        CROSSJOIN ( VALUES ( dCompany[CompanyKey] ), VALUES ( dDocType[TypeKey] ) ),
+        CALCULATE ( SELECTEDVALUE ( dDocType[IsMandatory] ) ) = TRUE ()
+    )
+VAR _heldPairs =
+    SUMMARIZE ( fDocuments, dCompany[CompanyKey], dDocType[TypeKey] )
+RETURN
+    COUNTROWS ( EXCEPT ( _requiredPairs, _heldPairs ) )
+
+// ============================================================================
+// 4. RENEWAL PERFORMANCE
+// ============================================================================
+
+Renewals In Flight =
+CALCULATE (
+    COUNTROWS ( fRenewals ),
+    NOT fRenewals[RequestStage] IN { "Registered", "Cancelled" }
+)
+
+Avg Renewal Cycle Days =
+AVERAGEX (
+    FILTER ( fRenewals, fRenewals[RequestStage] = "Registered" ),
+    DATEDIFF ( fRenewals[Created], fRenewals[Modified], DAY )
+)
+
+Renewals Breaching SLA =
+CALCULATE ( COUNTROWS ( fRenewals ), fRenewals[SLABreached] = TRUE () )
+
+On-Time Renewal Rate =
+VAR _done   = CALCULATE ( COUNTROWS ( fRenewals ), fRenewals[RequestStage] = "Registered" )
+VAR _onTime = CALCULATE ( COUNTROWS ( fRenewals ), fRenewals[RequestStage] = "Registered", fRenewals[SLABreached] = FALSE () )
+RETURN DIVIDE ( _onTime, _done )
+
+// ----------------------------------------------------------------------------
+// Lapse rate — the number that actually matters to the board.
+// "Did any mandatory document ever go past its expiry date unrenewed?"
+// ----------------------------------------------------------------------------
+Lapse Events YTD =
+CALCULATE (
+    COUNTROWS ( fAudit ),
+    fAudit[EventType] = "StatusChange:Expired",
+    DATESYTD ( dDate[Date] )
+)
+
+Lapse Rate YTD =
+DIVIDE ( [Lapse Events YTD], CALCULATE ( [Mandatory Documents], ALL ( dDate ) ) )
+
+// ============================================================================
+// 5. NOTIFICATION EFFECTIVENESS
+// Proves the alerting is actually working — and that people act on it.
+// ============================================================================
+
+Notifications Sent 30d =
+CALCULATE (
+    COUNTROWS ( fNotifications ),
+    fNotifications[SendStatus] = "Sent",
+    dDate[Date] >= TODAY () - 30
+)
+
+Notification Failure Rate =
+DIVIDE (
+    CALCULATE ( COUNTROWS ( fNotifications ), fNotifications[SendStatus] = "Failed" ),
+    COUNTROWS ( fNotifications )
+)
+
+// Median days between the FIRST reminder and the renewal actually starting.
+// If this number creeps up, the reminders have stopped being read.
+Reminder-to-Action Days =
+MEDIANX (
+    FILTER ( fRenewals, NOT ISBLANK ( fRenewals[FirstReminderDate] ) ),
+    DATEDIFF ( fRenewals[FirstReminderDate], fRenewals[Created], DAY )
+)
+
+// ============================================================================
+// 6. FORECAST — renewal workload by month, for capacity planning
+// ============================================================================
+
+Expiries In Period =
+CALCULATE (
+    [Active Documents],
+    USERELATIONSHIP ( fDocuments[ExpiryDate], dDate[Date] )
+)
+
+Renewal Cost Forecast =
+SUMX (
+    FILTER ( fDocuments, fDocuments[ExpiryDate] >= TODAY () && fDocuments[ExpiryDate] <= TODAY () + 365 ),
+    RELATED ( dDocType[EstimatedRenewalCostSAR] )
+)
+
+// ============================================================================
+// 7. OPERATIONAL HEALTH — is the automation itself alive?
+// A dashboard that looks green because the data stopped updating is the worst
+// possible failure mode. This measure makes that state visible.
+// ============================================================================
+
+Hours Since Status Engine Ran =
+VAR _last =
+    CALCULATE ( MAX ( fAudit[EventUtc] ), fAudit[EventType] = "FlowRun:StatusEngine" )
+RETURN DATEDIFF ( _last, UTCNOW (), HOUR )
+
+Flow Health =
+SWITCH (
+    TRUE (),
+    ISBLANK ( [Hours Since Status Engine Ran] ), "⛔ NEVER RAN",
+    [Hours Since Status Engine Ran] > 48,        "⛔ STALE — data is " & [Hours Since Status Engine Ran] & "h old",
+    [Hours Since Status Engine Ran] > 26,        "⚠ LATE",
+    "✅ Healthy"
+)
+
+// ============================================================================
+// 8. DYNAMIC TITLES & NARRATIVE
+// ============================================================================
+
+Dashboard Subtitle =
+VAR _exp  = [Documents Expired]
+VAR _s30  = [Documents Expiring 30d]
+RETURN
+SWITCH (
+    TRUE (),
+    _exp > 0,  "⛔ " & _exp & " document(s) have lapsed — immediate action required",
+    _s30 > 0,  "⚠ " & _s30 & " document(s) expire within 30 days",
+    "✅ All documents current — next expiry in " & [Days To Next Expiry] & " days"
+)
+
+Days To Next Expiry =
+VAR _next =
+    CALCULATE (
+        MIN ( fDocuments[ExpiryDate] ),
+        fDocuments[ExpiryDate] > TODAY (),
+        NOT fDocuments[DocStatus] IN { "Archived", "Superseded" }
+    )
+RETURN DATEDIFF ( TODAY (), _next, DAY )
+
+
+// ============================================================================
+// ROW-LEVEL SECURITY
+// Role "DepartmentScope" on dDepartment:
+//     [DeptOwnerUPN] = USERPRINCIPALNAME()
+//     || PATHCONTAINS ( [DeptViewerUPNs], USERPRINCIPALNAME() )
+// Role "ComplianceAll": no filter (full visibility).
+// Test with "View as role" BEFORE publishing — an RLS mistake in a document
+// compliance report is a confidentiality incident, not a bug.
+// ============================================================================

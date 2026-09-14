@@ -1,0 +1,1425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EDMS Blueprint — System Design Specification</title>
+<style>
+  :root{color-scheme:light dark}
+  html,body{margin:0;padding:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+  @media print{
+    .rail{display:none!important}
+    .layout{display:block!important}
+    section{break-inside:auto;page-break-inside:auto}
+    .fig-frame,.tw,.defect,.note{break-inside:avoid;page-break-inside:avoid}
+    h2{break-after:avoid;page-break-after:avoid}
+    body{background:#fff!important}
+  }
+</style>
+
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   TOKENS — complete light palette on bare :root, redefined for both dark paths
+   Neutrals carry a slight blue bias toward the ink-blue accent.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --ground:      #F4F6F8;
+  --surface:     #FFFFFF;
+  --surface-2:   #EDF0F4;
+  --sunk:        #E4E8EE;
+  --ink:         #161B22;
+  --ink-2:       #3C4652;
+  --ink-3:       #6B7684;
+  --hairline:    #D8DDE4;
+  --hairline-2:  #C2C9D3;
+
+  --accent:      #153E75;   /* ink blue — registry / notary */
+  --accent-soft: #E3EAF5;
+  --accent-ink:  #0E2A52;
+  --brass:       #9A6E28;   /* embossed seal */
+  --brass-soft:  #F6EEDD;
+
+  --ok:          #2C6E3C;   --ok-soft:   #E0EFE3;
+  --warn:        #A8690B;   --warn-soft: #FAEEDA;
+  --crit:        #A02828;   --crit-soft: #F9E3E3;
+  --dead:        #6B1414;   --dead-soft: #EED6D6;
+
+  --shadow:      0 1px 2px rgba(21,62,117,.06), 0 6px 20px -10px rgba(21,62,117,.18);
+
+  --serif: "Cambria", Georgia, "Times New Roman", serif;
+  --sans:  "Segoe UI", "Segoe UI Arabic", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono:  "Consolas", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --measure: 74ch;
+  --rail: 250px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:     #0E1217;
+    --surface:    #161B22;
+    --surface-2:  #1D242D;
+    --sunk:       #0A0D11;
+    --ink:        #E6EAF0;
+    --ink-2:      #BAC3CF;
+    --ink-3:      #8A96A5;
+    --hairline:   #2A323D;
+    --hairline-2: #3A4450;
+    --accent:      #7BA8E2;
+    --accent-soft: #1B2A40;
+    --accent-ink:  #A9C6EE;
+    --brass:       #D0A15C;
+    --brass-soft:  #2C2416;
+    --ok:   #6FBE81;  --ok-soft:   #16301C;
+    --warn: #E0A144;  --warn-soft: #33250E;
+    --crit: #E3787A;  --crit-soft: #351A1A;
+    --dead: #C25757;  --dead-soft: #2A1212;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 26px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:     #0E1217;
+  --surface:    #161B22;
+  --surface-2:  #1D242D;
+  --sunk:       #0A0D11;
+  --ink:        #E6EAF0;
+  --ink-2:      #BAC3CF;
+  --ink-3:      #8A96A5;
+  --hairline:   #2A323D;
+  --hairline-2: #3A4450;
+  --accent:      #7BA8E2;
+  --accent-soft: #1B2A40;
+  --accent-ink:  #A9C6EE;
+  --brass:       #D0A15C;
+  --brass-soft:  #2C2416;
+  --ok:   #6FBE81;  --ok-soft:   #16301C;
+  --warn: #E0A144;  --warn-soft: #33250E;
+  --crit: #E3787A;  --crit-soft: #351A1A;
+  --dead: #C25757;  --dead-soft: #2A1212;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 26px -12px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── shell ─────────────────────────────────────────────────────────────── */
+.shell { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 0 96px; }
+
+/* ── masthead ──────────────────────────────────────────────────────────── */
+.mast {
+  border-bottom: 2px solid var(--ink);
+  padding-block: 40px 22px;
+  margin-bottom: 34px;
+}
+.mast-kicker {
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 500;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--brass);
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline;
+}
+.mast h1 {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(30px, 5.2vw, 50px);
+  line-height: 1.08;
+  letter-spacing: -.02em;
+  margin: 14px 0 6px;
+  text-wrap: balance;
+}
+.mast .ar {
+  font-size: clamp(17px, 2.6vw, 23px);
+  color: var(--ink-2);
+  font-weight: 500;
+  direction: rtl;
+  margin-bottom: 16px;
+}
+.mast-meta {
+  display: flex; flex-wrap: wrap; gap: 8px 26px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
+  padding-top: 12px; border-top: 1px solid var(--hairline);
+}
+.mast-meta b { color: var(--ink-2); font-weight: 500; }
+
+/* ── layout: rail + column ─────────────────────────────────────────────── */
+.layout { display: block; }
+@media (min-width: 1040px) {
+  .layout { display: grid; grid-template-columns: var(--rail) minmax(0,1fr); gap: 56px; align-items: start; }
+  .rail { position: sticky; top: 20px; max-height: calc(100vh - 40px); overflow-y: auto; }
+}
+.rail { margin-bottom: 40px; }
+.rail-title {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink-3);
+  padding-bottom: 10px; border-bottom: 1px solid var(--hairline); margin-bottom: 6px;
+}
+.rail a {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 5px 0; text-decoration: none; color: var(--ink-2);
+  font-size: 13.5px; line-height: 1.35;
+  border-bottom: 1px solid transparent;
+}
+.rail a:hover { color: var(--accent); }
+.rail a .num { font-family: var(--mono); font-size: 11px; color: var(--ink-3); min-width: 22px; }
+.rail a.on { color: var(--accent); font-weight: 600; }
+.rail a.on .num { color: var(--accent); }
+
+/* ── sections ──────────────────────────────────────────────────────────── */
+section { scroll-margin-top: 20px; padding-block: 10px 44px; }
+section + section { border-top: 1px solid var(--hairline); padding-top: 44px; }
+.sec-head { margin-bottom: 22px; }
+.sec-num {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 500;
+  color: var(--brass); letter-spacing: .1em;
+}
+h2 {
+  font-family: var(--serif); font-weight: 600;
+  font-size: clamp(23px, 3.4vw, 31px); line-height: 1.16;
+  letter-spacing: -.015em; margin: 4px 0 2px; text-wrap: balance;
+}
+h2 .h2-ar { display: block; font-family: var(--sans); font-size: .60em; font-weight: 500; color: var(--ink-3); direction: rtl; margin-top: 4px; }
+h3 {
+  font-family: var(--sans); font-weight: 600; font-size: 16.5px;
+  margin: 30px 0 10px; letter-spacing: -.005em;
+}
+h4 { font-family: var(--mono); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 24px 0 8px; font-weight: 500; }
+p { margin: 0 0 14px; max-width: var(--measure); }
+.lede { font-size: 16.5px; color: var(--ink-2); max-width: var(--measure); }
+.lede-ar { direction: rtl; text-align: right; font-size: 16px; color: var(--ink-2); border-right: 3px solid var(--brass); padding-right: 16px; margin: 0 0 22px; max-width: var(--measure); margin-inline-start: auto; }
+ul, ol { max-width: var(--measure); padding-inline-start: 22px; margin: 0 0 16px; }
+li { margin-bottom: 7px; }
+strong { font-weight: 600; }
+code {
+  font-family: var(--mono); font-size: .875em;
+  background: var(--surface-2); padding: 1.5px 5px; border-radius: 3px;
+  border: 1px solid var(--hairline);
+}
+a { color: var(--accent); }
+
+/* ── figures & tables ──────────────────────────────────────────────────── */
+figure { margin: 24px 0; }
+figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+figcaption {
+  font-size: 13px; color: var(--ink-3); margin-top: 10px;
+  padding-top: 8px; border-top: 1px solid var(--hairline);
+  max-width: var(--measure);
+}
+.fig-frame {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 3px; padding: 22px 18px; overflow-x: auto;
+}
+
+.tw { overflow-x: auto; margin: 18px 0; border: 1px solid var(--hairline); border-radius: 3px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 540px; }
+th {
+  text-align: start; font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .1em; text-transform: uppercase; font-weight: 500;
+  color: var(--ink-3); padding: 11px 14px;
+  border-bottom: 1px solid var(--hairline-2); background: var(--surface-2);
+  white-space: nowrap;
+}
+td { padding: 10px 14px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: end; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.tbl-ar { direction: rtl; }
+
+/* ── chips ─────────────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  letter-spacing: .04em; padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+}
+.chip.ok   { background: var(--ok-soft);   color: var(--ok); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.crit { background: var(--crit-soft); color: var(--crit); }
+.chip.dead { background: var(--dead-soft); color: var(--dead); }
+.chip.acc  { background: var(--accent-soft); color: var(--accent-ink); }
+.chip.brass{ background: var(--brass-soft); color: var(--brass); }
+.chip.mute { background: var(--surface-2); color: var(--ink-3); }
+
+/* ── stat strip ────────────────────────────────────────────────────────── */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px,1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 3px; margin: 26px 0; }
+.stat { background: var(--surface); padding: 16px 18px; }
+.stat .v { font-family: var(--serif); font-size: 27px; font-weight: 600; line-height: 1.1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.stat .k { font-family: var(--mono); font-size: 10px; letter-spacing: .11em; text-transform: uppercase; color: var(--ink-3); margin-top: 6px; }
+
+/* ── callout ───────────────────────────────────────────────────────────── */
+.note {
+  border-inline-start: 3px solid var(--accent);
+  background: var(--surface); padding: 15px 18px;
+  margin: 20px 0; max-width: var(--measure); font-size: 14.5px;
+}
+.note.hazard { border-inline-start-color: var(--crit); }
+.note.seal   { border-inline-start-color: var(--brass); }
+.note .nt {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3); display: block; margin-bottom: 6px;
+}
+.note p:last-child { margin-bottom: 0; }
+
+/* ── defect cards ──────────────────────────────────────────────────────── */
+.defects { display: grid; gap: 14px; margin: 22px 0; }
+@media (min-width: 780px) { .defects { grid-template-columns: 1fr 1fr; } }
+.defect { background: var(--surface); border: 1px solid var(--hairline); border-radius: 3px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.defect .dh { display: flex; gap: 10px; align-items: baseline; }
+.defect .dn { font-family: var(--mono); font-size: 11px; color: var(--crit); font-weight: 600; }
+.defect .dt { font-weight: 600; font-size: 14.5px; line-height: 1.3; }
+.defect .db { font-size: 13.5px; color: var(--ink-2); margin: 0; }
+.defect .df { font-size: 13px; color: var(--ink); border-top: 1px dashed var(--hairline-2); padding-top: 8px; margin: auto 0 0; }
+.defect .df b { color: var(--ok); font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 3px; }
+
+/* ── calculator ────────────────────────────────────────────────────────── */
+.calc { background: var(--surface); border: 1px solid var(--hairline-2); border-radius: 3px; margin: 24px 0; overflow: hidden; }
+.calc-grid { display: grid; }
+@media (min-width: 820px) { .calc-grid { grid-template-columns: 1fr 300px; } }
+.calc-in { padding: 22px; display: flex; flex-direction: column; gap: 18px; border-bottom: 1px solid var(--hairline); }
+@media (min-width: 820px) { .calc-in { border-bottom: none; border-inline-end: 1px solid var(--hairline); } }
+.ctl { display: flex; flex-direction: column; gap: 7px; }
+.ctl-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ctl label { font-size: 13.5px; font-weight: 500; }
+.ctl .hint { font-size: 12px; color: var(--ink-3); margin: 0; max-width: none; }
+.ctl output { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 20px; }
+input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+.tg { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 3px; padding: 7px 11px; cursor: pointer; }
+.tg input { accent-color: var(--accent); margin: 0; }
+.tg:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.calc-out { padding: 22px; background: var(--surface-2); display: flex; flex-direction: column; gap: 4px; }
+.co-total { font-family: var(--serif); font-size: 34px; font-weight: 600; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.co-sub { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 14px; }
+.co-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--hairline); }
+.co-line:last-of-type { border-bottom: none; }
+.co-line .cv { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.co-line.off { opacity: .38; }
+.co-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline-2); font-size: 12.5px; color: var(--ink-3); }
+.co-foot b { color: var(--ink); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ── roadmap ───────────────────────────────────────────────────────────── */
+.gantt { display: grid; grid-template-columns: 170px 1fr; gap: 1px 14px; align-items: center; font-size: 13px; margin: 20px 0; min-width: 560px; }
+.g-lab { padding: 6px 0; }
+.g-lab .gp { font-family: var(--mono); font-size: 10px; color: var(--brass); letter-spacing: .1em; display: block; }
+.g-lab .gn { font-weight: 500; }
+.g-track { position: relative; height: 26px; background: var(--sunk); border-radius: 2px; }
+.g-bar { position: absolute; top: 4px; height: 18px; border-radius: 2px; background: var(--accent); display: flex; align-items: center; padding-inline: 7px; }
+.g-bar span { font-family: var(--mono); font-size: 9.5px; color: var(--surface); letter-spacing: .06em; white-space: nowrap; }
+:root[data-theme="dark"] .g-bar span { color: #0E1217; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .g-bar span { color: #0E1217; } }
+.g-scale { display: grid; grid-template-columns: repeat(16,1fr); font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); text-align: center; padding-top: 4px; }
+
+/* ── misc ──────────────────────────────────────────────────────────────── */
+.two { display: grid; gap: 26px; }
+@media (min-width: 800px) { .two { grid-template-columns: 1fr 1fr; } }
+.deliverables { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); margin: 20px 0; }
+.dlv { background: var(--surface); border: 1px solid var(--hairline); border-radius: 3px; padding: 13px 15px; }
+.dlv .dk { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.dlv .dv { font-size: 13.5px; margin-top: 4px; }
+footer { border-top: 2px solid var(--ink); margin-top: 48px; padding-top: 18px; font-size: 12.5px; color: var(--ink-3); }
+footer p { max-width: var(--measure); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+</head>
+<body>
+<div class="shell">
+
+<header class="mast">
+  <div class="mast-kicker">
+    <span>Confidential · Internal</span><span>·</span><span>Riyadh, KSA</span><span>·</span>
+    <span>System Design Specification</span><span>·</span><span>v1.0</span>
+  </div>
+  <h1>EDMS — Enterprise Document Control</h1>
+  <div class="ar">نظام إدارة الوثائق الرسمية المؤسسي — مواصفات التصميم التقني</div>
+  <div class="mast-meta">
+    <span><b>Platform</b> SharePoint Online + Power Platform</span>
+    <span><b>Scale</b> 50–200 users · thousands of documents</span>
+    <span><b>Timeline</b> 16 weeks</span>
+    <span><b>Issued</b> 12 Sep 2026</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <nav class="rail" aria-label="Section index">
+    <div class="rail-title">Contents</div>
+    <a href="#s1"><span class="num">§1</span><span>Position &amp; Decision</span></a>
+    <a href="#s2"><span class="num">§2</span><span>Architecture</span></a>
+    <a href="#s3"><span class="num">§3</span><span>Data Model</span></a>
+    <a href="#s4"><span class="num">§4</span><span>Access Control</span></a>
+    <a href="#s5"><span class="num">§5</span><span>Workflows</span></a>
+    <a href="#s6"><span class="num">§6</span><span>Notification Ladder</span></a>
+    <a href="#s7"><span class="num">§7</span><span>Security &amp; Compliance</span></a>
+    <a href="#s8"><span class="num">§8</span><span>Seven Defects</span></a>
+    <a href="#s9"><span class="num">§9</span><span>Cost Model</span></a>
+    <a href="#s10"><span class="num">§10</span><span>Delivery Plan</span></a>
+    <a href="#s11"><span class="num">§11</span><span>Risks &amp; Decisions</span></a>
+  </nav>
+
+  <main>
+
+  <!-- ══════════════ §1 ══════════════ -->
+  <section id="s1">
+    <div class="sec-head">
+      <div class="sec-num">§ 01</div>
+      <h2>Position &amp; the one decision that matters<span class="h2-ar">نقطة البداية والقرار الجوهري</span></h2>
+    </div>
+
+    <p class="lede-ar">القائمة الحالية <strong>Official Documents</strong> على SharePoint ليست نقطة صفر — بل أساس صالح. المطلوب ليس بناء نظام جديد من العدم، بل تحويل سجل يدوي إلى نظام حوكمة آلي بطبقات تنبيه وموافقات وتدقيق وامتثال، دون شراء منصة جديدة ودون صلاحيات إدارية على أجهزة المستخدمين.</p>
+
+    <p class="lede">The existing <code>Official Documents</code> list already carries the right column set — document number, issuing authority, company, issue and expiry dates, department owner, reminder date, mandatory flag, days-to-expire, status. That is not a starting point to discard. It is a register that has outgrown being a register.</p>
+
+    <p>What it lacks is everything that turns a list into a <strong>control system</strong>: a status value that is actually true today, an alert ladder that escalates, an approval chain that is evidence, an audit trail that survives a deletion, and a retention policy that a regulator would accept. This specification adds those seven layers on top of what exists, on the Microsoft 365 licences the organisation already owns.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="v">10</div><div class="k">SharePoint lists</div></div>
+      <div class="stat"><div class="v">8</div><div class="k">Automated flows</div></div>
+      <div class="stat"><div class="v">6</div><div class="k">RBAC roles</div></div>
+      <div class="stat"><div class="v">94</div><div class="k">Test cases</div></div>
+      <div class="stat"><div class="v">1</div><div class="k">Premium licence</div></div>
+    </div>
+
+    <div class="note seal">
+      <span class="nt">The decision this document argues for</span>
+      <p><strong>Build on SharePoint Online, not Dataverse — for now.</strong> Dataverse gives a proper relational model and row-level security, but it requires Power Apps Premium at $20/user/month. At 200 users that is $48,000 a year before a single line of logic is written. SharePoint Lists handle thousands of documents comfortably when the views are indexed and filtered. <strong>The migration trigger to Dataverse is written into §11</strong> so the decision is revisited on evidence, not on a hunch.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════ §2 ══════════════ -->
+  <section id="s2">
+    <div class="sec-head">
+      <div class="sec-num">§ 02</div>
+      <h2>System architecture<span class="h2-ar">البنية التقنية للنظام</span></h2>
+    </div>
+
+    <p>Five layers, with governance running vertically through all of them. The notable feature is the <strong>premium lane</strong>: every flow that needs an outbound HTTP call is isolated behind one service account, so premium licensing is a single $150/month line rather than a per-user tax.</p>
+
+    <figure>
+      <div class="fig-frame">
+      <svg viewBox="0 0 900 500" role="img" aria-label="Five-layer architecture: clients, experience, automation with an isolated premium lane, data, and a vertical governance plane spanning all layers.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+          </marker>
+          <marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" fill="#9A6E28"/>
+          </marker>
+        </defs>
+        <g font-family="Segoe UI, Arial, sans-serif" fill="currentColor">
+
+          <!-- governance plane -->
+          <rect x="700" y="28" width="176" height="420" rx="3" fill="none" stroke="#9A6E28" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="788" y="50" text-anchor="middle" font-size="12" font-weight="600" fill="#9A6E28">Governance Plane</text>
+          <text x="788" y="66" text-anchor="middle" font-size="10" fill="#9A6E28" opacity=".85">spans every layer</text>
+          <g font-size="11">
+            <rect x="716" y="82"  width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="101" text-anchor="middle">Microsoft Entra ID</text>
+            <rect x="716" y="120" width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="139" text-anchor="middle">Conditional Access</text>
+            <rect x="716" y="158" width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="177" text-anchor="middle">Sensitivity labels</text>
+            <rect x="716" y="196" width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="215" text-anchor="middle">DLP policies</text>
+            <rect x="716" y="234" width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="253" text-anchor="middle">Unified Audit Log</text>
+            <rect x="716" y="272" width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="291" text-anchor="middle">Retention labels</text>
+            <rect x="716" y="310" width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="329" text-anchor="middle">Key Vault (secrets)</text>
+            <rect x="716" y="348" width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="367" text-anchor="middle">M365 Backup</text>
+            <rect x="716" y="386" width="144" height="30" rx="2" fill="currentColor" opacity=".05"/>
+            <text x="788" y="405" text-anchor="middle">Defender for O365</text>
+          </g>
+
+          <!-- L1 clients -->
+          <text x="24" y="42" font-family="Consolas, monospace" font-size="10" letter-spacing="1.5" opacity=".6">L1 · CLIENTS</text>
+          <g font-size="11.5">
+            <rect x="24"  y="52" width="118" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/>
+            <text x="83"  y="74" text-anchor="middle">Browser</text>
+            <rect x="152" y="52" width="118" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/>
+            <text x="211" y="74" text-anchor="middle">Teams</text>
+            <rect x="280" y="52" width="118" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/>
+            <text x="339" y="74" text-anchor="middle">Outlook</text>
+            <rect x="408" y="52" width="118" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/>
+            <text x="467" y="74" text-anchor="middle">Mobile app</text>
+            <rect x="536" y="52" width="118" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/>
+            <text x="595" y="74" text-anchor="middle">SMS</text>
+          </g>
+
+          <line x1="339" y1="88" x2="339" y2="110" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+
+          <!-- L2 experience -->
+          <text x="24" y="126" font-family="Consolas, monospace" font-size="10" letter-spacing="1.5" opacity=".6">L2 · EXPERIENCE</text>
+          <rect x="24" y="134" width="630" height="58" rx="3" fill="currentColor" opacity=".04"/>
+          <g font-size="11.5">
+            <rect x="38"  y="146" width="140" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="108" y="162" text-anchor="middle">Indexed list views</text>
+            <text x="108" y="175" text-anchor="middle" font-size="9.5" opacity=".6">seeded licence</text>
+            <rect x="188" y="146" width="140" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="258" y="162" text-anchor="middle">Formatted forms</text>
+            <text x="258" y="175" text-anchor="middle" font-size="9.5" opacity=".6">JSON formatting</text>
+            <rect x="338" y="146" width="140" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="408" y="162" text-anchor="middle">Teams tab</text>
+            <text x="408" y="175" text-anchor="middle" font-size="9.5" opacity=".6">adaptive cards</text>
+            <rect x="488" y="146" width="152" height="34" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="564" y="162" text-anchor="middle">Power BI dashboard</text>
+            <text x="564" y="175" text-anchor="middle" font-size="9.5" opacity=".6">RLS by department</text>
+          </g>
+
+          <line x1="339" y1="192" x2="339" y2="216" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+          <text x="348" y="208" font-size="10" opacity=".65">reads / writes</text>
+
+          <!-- L3 automation -->
+          <text x="24" y="232" font-family="Consolas, monospace" font-size="10" letter-spacing="1.5" opacity=".6">L3 · AUTOMATION</text>
+          <rect x="24" y="240" width="630" height="112" rx="3" fill="currentColor" opacity=".04"/>
+          <g font-size="11">
+            <rect x="38"  y="252" width="118" height="42" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="97"  y="270" text-anchor="middle" font-weight="600">Status Engine</text>
+            <text x="97"  y="284" text-anchor="middle" font-size="9.5" opacity=".65">nightly 02:00</text>
+            <rect x="166" y="252" width="118" height="42" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="225" y="270" text-anchor="middle" font-weight="600">Notifications</text>
+            <text x="225" y="284" text-anchor="middle" font-size="9.5" opacity=".65">daily 06:00</text>
+            <rect x="294" y="252" width="118" height="42" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="353" y="270" text-anchor="middle" font-weight="600">Approvals</text>
+            <text x="353" y="284" text-anchor="middle" font-size="9.5" opacity=".65">event-driven</text>
+            <rect x="422" y="252" width="118" height="42" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="481" y="270" text-anchor="middle" font-weight="600">Renewal</text>
+            <text x="481" y="284" text-anchor="middle" font-size="9.5" opacity=".65">SLA tracked</text>
+            <rect x="550" y="252" width="90" height="42" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="595" y="270" text-anchor="middle" font-weight="600">Retention</text>
+            <text x="595" y="284" text-anchor="middle" font-size="9.5" opacity=".65">monthly</text>
+          </g>
+
+          <!-- premium lane -->
+          <rect x="38" y="304" width="602" height="38" rx="2" fill="#9A6E28" opacity=".10"/>
+          <rect x="38" y="304" width="602" height="38" rx="2" fill="none" stroke="#9A6E28" stroke-width="1.4"/>
+          <text x="50" y="320" font-size="10.5" font-weight="600" fill="#9A6E28" font-family="Consolas, monospace" letter-spacing=".8">PREMIUM LANE</text>
+          <text x="50" y="334" font-size="10" fill="#9A6E28">1 × Power Automate Process licence · svc-edms-automation@company.com</text>
+          <text x="628" y="320" font-size="10.5" text-anchor="end" fill="#9A6E28">HTTP → SMS gateway</text>
+          <text x="628" y="334" font-size="10.5" text-anchor="end" fill="#9A6E28">HTTP → eSignature</text>
+          <line x1="640" y1="323" x2="700" y2="323" stroke="#9A6E28" stroke-width="1.3" marker-end="url(#arB)"/>
+
+          <line x1="339" y1="352" x2="339" y2="378" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+          <text x="348" y="370" font-size="10" opacity=".65">stamps status · logs events</text>
+
+          <!-- L4 data -->
+          <text x="24" y="394" font-family="Consolas, monospace" font-size="10" letter-spacing="1.5" opacity=".6">L4 · DATA</text>
+          <rect x="24" y="402" width="630" height="46" rx="3" fill="currentColor" opacity=".07"/>
+          <g font-size="11">
+            <rect x="38"  y="412" width="150" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="113" y="429" text-anchor="middle">DocumentRegistry</text>
+            <rect x="198" y="412" width="128" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="262" y="429" text-anchor="middle">4 reference lists</text>
+            <rect x="336" y="412" width="140" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="406" y="429" text-anchor="middle">5 operational lists</text>
+            <rect x="486" y="412" width="154" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <text x="563" y="429" text-anchor="middle">Document library</text>
+          </g>
+        </g>
+      </svg>
+      </div>
+      <figcaption><strong>Figure 1.</strong> Premium connectors exist in exactly one place. Every other flow uses SharePoint, Outlook, Teams and Approvals, which are covered by the Microsoft&nbsp;365 seeded licence — this is the single design choice that keeps recurring cost in four figures instead of five.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ══════════════ §3 ══════════════ -->
+  <section id="s3">
+    <div class="sec-head">
+      <div class="sec-num">§ 03</div>
+      <h2>Data model<span class="h2-ar">نموذج البيانات</span></h2>
+    </div>
+
+    <p class="lede-ar">القاعدة الحاكمة: البيانات الوصفية مفصولة عن الملفات. الجميع يرى أن «السجل التجاري» موجود وتاريخ انتهائه — لكن فتح ملف PDF للضمان البنكي محكوم بصلاحية مستقلة. هذا الفصل هو ما يجعل النظام قابلاً للتوسع أمنياً.</p>
+
+    <p><strong>Metadata and binaries are separated on purpose.</strong> The registry list holds the facts everyone needs to see; the document library holds the files, with its own permission surface. That is what lets "every employee can see the company holds a valid CR" coexist with "only Legal can open the bank guarantee PDF" — without duplicating rows or breaking inheritance on thousands of items.</p>
+
+    <figure>
+      <div class="fig-frame">
+      <svg viewBox="0 0 920 660" role="img" aria-label="Entity relationship diagram: four reference lists feed the central DocumentRegistry, which in turn drives five operational lists and a document library.">
+        <defs>
+          <marker id="er" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-family="Segoe UI, Arial, sans-serif" fill="currentColor">
+
+          <text x="24"  y="22" font-family="Consolas, monospace" font-size="10" letter-spacing="1.4" opacity=".6">REFERENCE</text>
+          <text x="340" y="22" font-family="Consolas, monospace" font-size="10" letter-spacing="1.4" opacity=".6">MASTER</text>
+          <text x="700" y="22" font-family="Consolas, monospace" font-size="10" letter-spacing="1.4" opacity=".6">OPERATIONAL</text>
+
+          <!-- ══ reference column ══ -->
+          <g font-size="10.5">
+            <!-- DocumentTypes -->
+            <rect x="24" y="34" width="182" height="126" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="24" y="34" width="182" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="34" y="51" font-size="11.5" font-weight="600">DocumentTypes</text>
+            <text x="34" y="74">TypeCategory</text>
+            <text x="34" y="90">DefaultValidityMonths</text>
+            <text x="34" y="106">ReminderTiers ·csv</text>
+            <text x="34" y="122">ApprovalTemplate</text>
+            <text x="34" y="138">RetentionYears</text>
+            <text x="34" y="154">SensitivityTier</text>
+
+            <!-- Companies -->
+            <rect x="24" y="176" width="182" height="78" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="24" y="176" width="182" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="34" y="193" font-size="11.5" font-weight="600">Companies</text>
+            <text x="34" y="216">CRNumber</text>
+            <text x="34" y="232">TaxID</text>
+            <text x="34" y="248">CountryCode</text>
+
+            <!-- Departments -->
+            <rect x="24" y="270" width="182" height="94" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="24" y="270" width="182" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="34" y="287" font-size="11.5" font-weight="600">Departments</text>
+            <text x="34" y="310">DeptOwner</text>
+            <text x="34" y="326">EscalationMgr</text>
+            <text x="34" y="342">ExecSponsor</text>
+            <text x="34" y="358">SecurityGroup</text>
+
+            <!-- IssuingAuthorities -->
+            <rect x="24" y="380" width="182" height="78" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="24" y="380" width="182" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="34" y="397" font-size="11.5" font-weight="600">IssuingAuthorities</text>
+            <text x="34" y="420">RenewalPortalUrl</text>
+            <text x="34" y="436">RenewalChannel</text>
+            <text x="34" y="452">TypicalLeadDays</text>
+
+            <!-- Delegations -->
+            <rect x="24" y="500" width="182" height="94" rx="3" fill="none" stroke="#9A6E28" stroke-width="1.3"/>
+            <rect x="24" y="500" width="182" height="24" rx="3" fill="#9A6E28" opacity=".12"/>
+            <text x="34" y="517" font-size="11.5" font-weight="600" fill="#9A6E28">Delegations</text>
+            <text x="34" y="540">Delegator → Delegate</text>
+            <text x="34" y="556">ValidFrom / ValidUntil</text>
+            <text x="34" y="572">ScopeDept</text>
+            <text x="34" y="588">IsRevoked</text>
+          </g>
+
+          <!-- ══ master ══ -->
+          <rect x="316" y="34" width="228" height="424" rx="3" fill="currentColor" opacity=".05"/>
+          <rect x="316" y="34" width="228" height="424" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+          <rect x="316" y="34" width="228" height="28" rx="3" fill="currentColor" opacity=".14"/>
+          <text x="328" y="53" font-size="12.5" font-weight="600">DocumentRegistry</text>
+          <g font-size="10.5">
+            <text x="328" y="80"  font-weight="600">— identity</text>
+            <text x="328" y="96">Title · DocumentNameEn</text>
+            <text x="328" y="112">DocumentNumber ★</text>
+            <text x="328" y="128">DocumentUID ★</text>
+            <text x="328" y="152" font-weight="600">— classification</text>
+            <text x="328" y="168">DocumentTypeLookup ★</text>
+            <text x="328" y="184">CompanyLookup ★</text>
+            <text x="328" y="200">DepartmentLookup ★</text>
+            <text x="328" y="216">AuthorityLookup</text>
+            <text x="328" y="240" font-weight="600">— lifecycle</text>
+            <text x="328" y="256">IssueDate · ExpiryDate ★</text>
+            <text x="328" y="272">IsPerpetual · LastRenewedOn</text>
+            <text x="328" y="296" font-weight="600">— state (flow-stamped)</text>
+            <text x="328" y="312">DocStatus ★</text>
+            <text x="328" y="328">DaysToExpire ★</text>
+            <text x="328" y="344">RiskBand · IsMandatoryDoc ★</text>
+            <text x="328" y="368" font-weight="600">— ownership</text>
+            <text x="328" y="384">DocumentOwner ★ · BackupOwner</text>
+            <text x="328" y="400">ComplianceOwner</text>
+            <text x="328" y="424" font-weight="600">— governance</text>
+            <text x="328" y="440">RetentionClass · DisposalDate</text>
+            <text x="328" y="452" font-size="9.5" opacity=".65">★ = indexed column</text>
+          </g>
+
+          <!-- ══ operational column ══ -->
+          <g font-size="10.5">
+            <rect x="700" y="34" width="196" height="78" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="700" y="34" width="196" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="710" y="51" font-size="11.5" font-weight="600">Files ·library</text>
+            <text x="710" y="74">LinkedDocumentId</text>
+            <text x="710" y="90">FilePurpose</text>
+            <text x="710" y="106">500 major / 10 minor vers.</text>
+
+            <rect x="700" y="132" width="196" height="94" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="700" y="132" width="196" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="710" y="149" font-size="11.5" font-weight="600">RenewalRequests</text>
+            <text x="710" y="172">RequestStage</text>
+            <text x="710" y="188">AssignedTo · TargetDate</text>
+            <text x="710" y="204">EstimatedCost</text>
+            <text x="710" y="220">SLABreached</text>
+
+            <rect x="700" y="246" width="196" height="94" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="700" y="246" width="196" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="710" y="263" font-size="11.5" font-weight="600">ApprovalSteps</text>
+            <text x="710" y="286">StepOrder · Approver</text>
+            <text x="710" y="302">StepOutcome</text>
+            <text x="710" y="318">RespondedOn · Comments</text>
+            <text x="710" y="334">SignatureRef</text>
+
+            <rect x="700" y="360" width="196" height="78" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="700" y="360" width="196" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="710" y="377" font-size="11.5" font-weight="600">NotificationLog</text>
+            <text x="710" y="400">IdempotencyKey ★</text>
+            <text x="710" y="416">TierDays · Channel</text>
+            <text x="710" y="432">SendStatus · ErrorDetail</text>
+
+            <rect x="700" y="458" width="196" height="94" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <rect x="700" y="458" width="196" height="24" rx="3" fill="currentColor" opacity=".09"/>
+            <text x="710" y="475" font-size="11.5" font-weight="600">AuditLog ·write-once</text>
+            <text x="710" y="498">EventUtc ★ · ActorUpn ★</text>
+            <text x="710" y="514">EventType ★</text>
+            <text x="710" y="530">BeforeJson / AfterJson</text>
+            <text x="710" y="546">CorrelationId</text>
+          </g>
+
+          <!-- ══ relationships in ══ -->
+          <g stroke="currentColor" stroke-width="1.2" fill="none">
+            <path d="M206 97  H262 V180 H316" marker-end="url(#er)"/>
+            <path d="M206 215 H278 V200 H316" marker-end="url(#er)"/>
+            <path d="M206 317 H290 V232 H316" marker-end="url(#er)"/>
+            <path d="M206 419 H250 V264 H316" marker-end="url(#er)"/>
+            <path d="M206 547 H236 V440 H316" marker-end="url(#er)" stroke="#9A6E28" stroke-dasharray="4 3"/>
+          </g>
+          <g font-size="9.5" font-family="Consolas, monospace" opacity=".75">
+            <text x="216" y="92">1:N  defines policy</text>
+            <text x="216" y="210">1:N  owns</text>
+            <text x="216" y="312">1:N  accountable</text>
+            <text x="216" y="414">1:N  issues</text>
+            <text x="216" y="542" fill="#9A6E28" opacity="1">overrides owner</text>
+          </g>
+
+          <!-- ══ relationships out ══ -->
+          <g stroke="currentColor" stroke-width="1.2" fill="none">
+            <path d="M544 90  H626 V72  H700" marker-end="url(#er)"/>
+            <path d="M544 180 H614 V178 H700" marker-end="url(#er)"/>
+            <path d="M544 300 H602 V292 H700" marker-end="url(#er)"/>
+            <path d="M544 360 H614 V398 H700" marker-end="url(#er)"/>
+            <path d="M544 430 H626 V504 H700" marker-end="url(#er)"/>
+          </g>
+          <g font-size="9.5" font-family="Consolas, monospace" opacity=".75">
+            <text x="552" y="84">1:N  stores</text>
+            <text x="552" y="172">1:N  renews</text>
+            <text x="552" y="292">1:N  approves</text>
+            <text x="552" y="354">1:N  alerts</text>
+            <text x="552" y="424">1:N  records</text>
+          </g>
+        </g>
+      </svg>
+      </div>
+      <figcaption><strong>Figure 2.</strong> Eleven entities. <code>DocumentTypes</code> is the policy engine — validity, reminder ladder, approval chain, retention and sensitivity are all attributes of the <em>type</em>, so Compliance retunes behaviour by editing a list row, never by editing a flow.</figcaption>
+    </figure>
+
+    <h3>Mapping from the existing list</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Existing column</th><th>Becomes</th><th>Change</th></tr></thead>
+        <tbody>
+          <tr><td>Document Name</td><td><code>Title</code> + <code>DocumentNameEn</code></td><td>Split into AR and EN so both sort and search correctly</td></tr>
+          <tr><td>Document Type</td><td><code>DocumentTypeLookup</code></td><td>Free text → lookup. Unlocks the entire policy engine</td></tr>
+          <tr><td>Document Number</td><td><code>DocumentNumber</code></td><td>Indexed; uniqueness validated at migration</td></tr>
+          <tr><td>Issuing Authority</td><td><code>AuthorityLookup</code></td><td>Gains portal URL, channel and lead time</td></tr>
+          <tr><td>Company</td><td><code>CompanyLookup</code></td><td>Gains CR number and tax ID — enables multi-entity coverage checks</td></tr>
+          <tr><td>Issue / Expiry Date</td><td><code>IssueDate</code>, <code>ExpiryDate</code></td><td>Normalised to UTC noon; expiry indexed</td></tr>
+          <tr><td>Country</td><td><code>CountryCode</code></td><td>Indexed</td></tr>
+          <tr><td>Department</td><td><code>DepartmentLookup</code></td><td>Gains owner, escalation manager, exec sponsor</td></tr>
+          <tr><td>Dep. Owner</td><td><code>DocumentOwner</code></td><td>Person field, required. Plus <code>BackupOwner</code></td></tr>
+          <tr><td>Reminder Date</td><td><em>replaced by</em> <code>ReminderTiers</code></td><td>One date → a per-type escalating ladder</td></tr>
+          <tr><td>Notes</td><td><code>DocNotes</code></td><td>Unchanged</td></tr>
+          <tr><td>Mantadory?</td><td><code>IsMandatoryDoc</code></td><td>Indexed; drives the weighted health score</td></tr>
+          <tr><td>Days to Expire</td><td><code>DaysToExpire</code></td><td><strong>Stamped nightly by flow</strong> — see §8, defect 1</td></tr>
+          <tr><td>Status</td><td><code>DocStatus</code></td><td>3 values → 8-state machine, flow-driven</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══════════════ §4 ══════════════ -->
+  <section id="s4">
+    <div class="sec-head">
+      <div class="sec-num">§ 04</div>
+      <h2>Access control<span class="h2-ar">صلاحيات الوصول والأدوار</span></h2>
+    </div>
+
+    <p>Six roles. Two of them exist because the obvious five-role model has a hole in it: a Compliance Officer needs to correct records but must never be able to erase evidence, and real organisations run on people covering for each other during leave.</p>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Role</th><th>Create</th><th>Read</th><th>Update</th><th>Delete</th><th>Approve</th><th>Configure</th><th>Scope</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>System Administrator</strong><br><span style="font-size:12px;color:var(--ink-3)">مسؤول النظام</span></td>
+            <td><span class="chip ok">yes</span></td><td><span class="chip ok">all</span></td><td><span class="chip ok">yes</span></td>
+            <td><span class="chip ok">yes</span></td><td><span class="chip mute">no</span></td><td><span class="chip ok">yes</span></td>
+            <td>Tenant-wide. 2 named people, PIM-elevated</td>
+          </tr>
+          <tr>
+            <td><strong>Compliance Officer</strong><br><span style="font-size:12px;color:var(--ink-3)">مسؤول الامتثال</span></td>
+            <td><span class="chip ok">yes</span></td><td><span class="chip ok">all</span></td><td><span class="chip ok">yes</span></td>
+            <td><span class="chip crit">never</span></td><td><span class="chip ok">yes</span></td><td><span class="chip warn">policy only</span></td>
+            <td>All departments. Custom role <code>Contribute No Delete</code></td>
+          </tr>
+          <tr>
+            <td><strong>Document Owner</strong><br><span style="font-size:12px;color:var(--ink-3)">مالك الوثيقة</span></td>
+            <td><span class="chip ok">yes</span></td><td><span class="chip warn">dept</span></td><td><span class="chip warn">own</span></td>
+            <td><span class="chip mute">no</span></td><td><span class="chip ok">step 1</span></td><td><span class="chip mute">no</span></td>
+            <td>Own department. ~25 people</td>
+          </tr>
+          <tr>
+            <td><strong>Approver / Reviewer</strong><br><span style="font-size:12px;color:var(--ink-3)">موجّه / معتمد</span></td>
+            <td><span class="chip mute">no</span></td><td><span class="chip warn">assigned</span></td><td><span class="chip mute">no</span></td>
+            <td><span class="chip mute">no</span></td><td><span class="chip ok">yes</span></td><td><span class="chip mute">no</span></td>
+            <td>Items routed to them only</td>
+          </tr>
+          <tr>
+            <td><strong>Reader</strong><br><span style="font-size:12px;color:var(--ink-3)">قارئ</span></td>
+            <td><span class="chip mute">no</span></td><td><span class="chip acc">metadata</span></td><td><span class="chip mute">no</span></td>
+            <td><span class="chip mute">no</span></td><td><span class="chip mute">no</span></td><td><span class="chip mute">no</span></td>
+            <td>Registry metadata; files only if ≤ Internal</td>
+          </tr>
+          <tr>
+            <td><strong>Delegate</strong> <span class="chip brass">time-boxed</span><br><span style="font-size:12px;color:var(--ink-3)">مفوَّض مؤقت</span></td>
+            <td colspan="6" style="color:var(--ink-2)">Inherits the delegator's rights, bounded by <code>ValidFrom</code>/<code>ValidUntil</code>, revocable, and <strong>additive only</strong> — the accountable owner stays on every thread.</td>
+            <td>Auto-expires. No manual cleanup step to forget</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note hazard">
+      <span class="nt">Permission architecture — the scaling trap</span>
+      <p>Do <strong>not</strong> apply unique item-level permissions per document. SharePoint supports 50,000 unique permissions per list but degrades badly past 5,000, and every break-inheritance operation is a write. Instead: the <strong>registry list stays readable</strong> to all staff (metadata is not the secret — the PDF is), and the <strong>document library</strong> is partitioned into folders by department with Entra security groups mapped to SharePoint groups. Confidential and Restricted files live in a separate library with its own inheritance break. Permission count then scales with the number of <em>departments</em>, not the number of <em>documents</em>.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════ §5 ══════════════ -->
+  <section id="s5">
+    <div class="sec-head">
+      <div class="sec-num">§ 05</div>
+      <h2>Document lifecycle<span class="h2-ar">دورة حياة الوثيقة وسير العمل</span></h2>
+    </div>
+
+    <p>Eight states, and every transition is either a human decision or a flow that writes an audit row. There is no path from <code>Valid</code> to gone.</p>
+
+    <figure>
+      <div class="fig-frame">
+      <svg viewBox="0 0 900 380" role="img" aria-label="State machine for a document: Draft to Pending Approval to Valid, then Expiring Soon, Under Renewal back to Valid, or Expired; Superseded and Archived are terminal, and disposition requires approval.">
+        <defs>
+          <marker id="sm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-family="Segoe UI, Arial, sans-serif" fill="currentColor" font-size="11.5">
+
+          <!-- row 1 -->
+          <rect x="24"  y="60" width="118" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="83"  y="87" text-anchor="middle">Draft</text>
+
+          <rect x="200" y="60" width="140" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="270" y="80" text-anchor="middle">Pending</text>
+          <text x="270" y="95" text-anchor="middle">Approval</text>
+
+          <rect x="398" y="60" width="118" height="44" rx="3" fill="#2C6E3C" opacity=".14"/>
+          <rect x="398" y="60" width="118" height="44" rx="3" fill="none" stroke="#2C6E3C" stroke-width="2"/>
+          <text x="457" y="87" text-anchor="middle" font-weight="600">Valid</text>
+
+          <rect x="574" y="60" width="140" height="44" rx="3" fill="#A8690B" opacity=".14"/>
+          <rect x="574" y="60" width="140" height="44" rx="3" fill="none" stroke="#A8690B" stroke-width="1.6"/>
+          <text x="644" y="80" text-anchor="middle">Expiring Soon</text>
+          <text x="644" y="95" text-anchor="middle" font-size="9.5" opacity=".8">≤ 30 days</text>
+
+          <!-- row 2 -->
+          <rect x="574" y="184" width="140" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="644" y="211" text-anchor="middle">Under Renewal</text>
+
+          <rect x="762" y="60" width="118" height="44" rx="3" fill="#A02828" opacity=".14"/>
+          <rect x="762" y="60" width="118" height="44" rx="3" fill="none" stroke="#A02828" stroke-width="2"/>
+          <text x="821" y="87" text-anchor="middle" font-weight="600" fill="#A02828">Expired</text>
+
+          <!-- row 3 terminal -->
+          <rect x="398" y="296" width="118" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 3"/>
+          <text x="457" y="323" text-anchor="middle">Superseded</text>
+
+          <rect x="574" y="296" width="140" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 3"/>
+          <text x="644" y="323" text-anchor="middle">Archived</text>
+
+          <!-- arrows -->
+          <g stroke="currentColor" stroke-width="1.3" fill="none">
+            <line x1="142" y1="82" x2="196" y2="82" marker-end="url(#sm)"/>
+            <line x1="340" y1="82" x2="394" y2="82" marker-end="url(#sm)"/>
+            <line x1="516" y1="82" x2="570" y2="82" marker-end="url(#sm)"/>
+            <line x1="714" y1="82" x2="758" y2="82" marker-end="url(#sm)"/>
+            <!-- reject loop -->
+            <path d="M270 104 V136 H83 V108" marker-end="url(#sm)" stroke-dasharray="4 3"/>
+            <!-- expiring -> renewal -->
+            <line x1="644" y1="104" x2="644" y2="180" marker-end="url(#sm)"/>
+            <!-- expired -> renewal -->
+            <path d="M821 104 V206 H718" marker-end="url(#sm)"/>
+            <!-- renewal -> valid -->
+            <path d="M574 206 H457 V108" marker-end="url(#sm)" stroke="#2C6E3C" stroke-width="1.6"/>
+            <!-- valid -> superseded -->
+            <path d="M440 104 V292" marker-end="url(#sm)" stroke-dasharray="4 3"/>
+            <!-- expired -> archived -->
+            <path d="M840 104 V260 H644 V292" marker-end="url(#sm)" stroke-dasharray="4 3"/>
+          </g>
+
+          <g font-size="9.5" font-family="Consolas, monospace" opacity=".8">
+            <text x="146" y="76">submit</text>
+            <text x="344" y="76">all approve</text>
+            <text x="520" y="76">T-30 nightly</text>
+            <text x="718" y="76">T+0</text>
+            <text x="176" y="132">rejected → back to author</text>
+            <text x="652" y="146">renewal starts</text>
+            <text x="726" y="200">late start</text>
+            <text x="470" y="200" fill="#2C6E3C" opacity="1">new expiry registered</text>
+            <text x="448" y="200" text-anchor="end">new version</text>
+            <text x="718" y="256">retention lapsed +</text>
+            <text x="718" y="268">disposition approved</text>
+          </g>
+
+          <!-- guard note -->
+          <rect x="24" y="296" width="340" height="44" rx="3" fill="#A02828" opacity=".08"/>
+          <rect x="24" y="296" width="340" height="44" rx="3" fill="none" stroke="#A02828" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <text x="38" y="314" font-size="10.5" font-weight="600" fill="#A02828">No delete transition exists</text>
+          <text x="38" y="330" font-size="10">Disposition is reviewed, approved, and logged — never automatic.</text>
+
+          <text x="24" y="30" font-family="Consolas, monospace" font-size="10" letter-spacing="1.4" opacity=".6">DOCUMENT STATE MACHINE</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption><strong>Figure 3.</strong> The green return path — <code>Under Renewal → Valid</code> — is the loop the whole system exists to close. Everything else is instrumentation around making sure that loop completes before the red state is reached.</figcaption>
+    </figure>
+
+    <h3>The eight flows</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Flow</th><th>Trigger</th><th>Licence</th><th>What it guarantees</th></tr></thead>
+        <tbody>
+          <tr><td><code>01 Status Engine</code></td><td>Nightly 02:00</td><td><span class="chip ok">seeded</span></td><td><code>DaysToExpire</code> and <code>DocStatus</code> are true today, not true on the day someone last edited the row</td></tr>
+          <tr><td><code>02 Notifications</code></td><td>Daily 06:00</td><td><span class="chip ok">seeded</span></td><td>Every tier fires exactly once, to the right people, with delegation resolved</td></tr>
+          <tr><td><code>03 Renewal</code></td><td>T-lead days, or manual</td><td><span class="chip ok">seeded</span></td><td>One renewal thread per document, SLA-tracked per stage</td></tr>
+          <tr><td><code>04 Approval Chain</code></td><td>Status → Pending Approval</td><td><span class="chip ok">seeded</span></td><td>Sequential, template-driven, rejection terminates cleanly</td></tr>
+          <tr><td><code>05 Weekly Digest</code></td><td>Sunday 07:00</td><td><span class="chip ok">seeded</span></td><td>One mail per owner — the one people don't filter</td></tr>
+          <tr><td><code>06 Audit Capture</code></td><td>Item created / modified</td><td><span class="chip ok">seeded</span></td><td>Before/after JSON for every business event</td></tr>
+          <tr><td><code>07 SMS Gateway</code></td><td>Child flow, HTTP</td><td><span class="chip brass">process</span></td><td>Tier ≤ 7 days only. CITC-registered sender ID</td></tr>
+          <tr><td><code>08 Retention</code></td><td>Monthly, 1st 03:00</td><td><span class="chip ok">seeded</span></td><td>Disposition proposed, never executed without approval</td></tr>
+          <tr><td><code>09 Watchdog</code></td><td>Daily 09:00</td><td><span class="chip ok">seeded</span></td><td>Escalates if flows 01 or 02 have not written a run summary in 26 h</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══════════════ §6 ══════════════ -->
+  <section id="s6">
+    <div class="sec-head">
+      <div class="sec-num">§ 06</div>
+      <h2>The notification ladder<span class="h2-ar">سُلّم التنبيهات المتدرج</span></h2>
+    </div>
+
+    <p class="lede-ar">التنبيه الواحد قبل الانتهاء لا يكفي. النظام يعتمد سُلّماً متدرجاً يتصاعد في الجمهور والقناة معاً — يبدأ بالمالك، وينتهي عند الرعاية التنفيذية ورسالة نصية.</p>
+
+    <p>Frequency escalates, but so does <em>audience</em> and <em>channel</em>. A reminder that goes to the same person through the same channel five times is one reminder repeated; a reminder whose recipient list widens is an escalation.</p>
+
+    <figure>
+      <div class="fig-frame">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Timeline from 180 days before expiry to overdue, showing which channels and recipients activate at each tier.">
+        <g font-family="Segoe UI, Arial, sans-serif" fill="currentColor">
+          <text x="24" y="24" font-family="Consolas, monospace" font-size="10" letter-spacing="1.4" opacity=".6">ESCALATION TIMELINE · DAYS BEFORE EXPIRY</text>
+
+          <!-- axis -->
+          <line x1="40" y1="88" x2="700" y2="88" stroke="currentColor" stroke-width="1.4"/>
+          <line x1="700" y1="88" x2="866" y2="88" stroke="#A02828" stroke-width="2.5"/>
+
+          <!-- expiry marker -->
+          <line x1="700" y1="56" x2="700" y2="252" stroke="#A02828" stroke-width="1.6" stroke-dasharray="4 3"/>
+          <text x="700" y="48" text-anchor="middle" font-size="11" font-weight="600" fill="#A02828">EXPIRY</text>
+          <text x="800" y="48" text-anchor="middle" font-size="10.5" font-weight="600" fill="#A02828">overdue · daily</text>
+
+          <!-- ticks -->
+          <g font-size="10.5" font-family="Consolas, monospace" text-anchor="middle">
+            <circle cx="60"  cy="88" r="4" fill="currentColor" opacity=".45"/><text x="60"  y="108">180</text>
+            <circle cx="160" cy="88" r="4" fill="currentColor" opacity=".45"/><text x="160" y="108">120</text>
+            <circle cx="260" cy="88" r="5" fill="#2C6E3C"/><text x="260" y="108">90</text>
+            <circle cx="380" cy="88" r="5" fill="#2C6E3C"/><text x="380" y="108">60</text>
+            <circle cx="500" cy="88" r="6" fill="#A8690B"/><text x="500" y="108" font-weight="600">30</text>
+            <circle cx="600" cy="88" r="6" fill="#A8690B"/><text x="600" y="108">14</text>
+            <circle cx="660" cy="88" r="7" fill="#A02828"/><text x="660" y="108" font-weight="600">7</text>
+            <circle cx="690" cy="88" r="5" fill="#A02828"/><text x="690" y="108">1</text>
+          </g>
+
+          <!-- channel bands -->
+          <g font-size="10.5">
+            <text x="24" y="146" font-family="Consolas, monospace" font-size="9.5" opacity=".7">EMAIL</text>
+            <rect x="60" y="134" width="640" height="14" rx="7" fill="currentColor" opacity=".22"/>
+            <rect x="700" y="134" width="166" height="14" rx="7" fill="#A02828" opacity=".35"/>
+
+            <text x="24" y="174" font-family="Consolas, monospace" font-size="9.5" opacity=".7">TEAMS</text>
+            <rect x="260" y="162" width="440" height="14" rx="7" fill="currentColor" opacity=".22"/>
+            <rect x="700" y="162" width="166" height="14" rx="7" fill="#A02828" opacity=".35"/>
+
+            <text x="24" y="202" font-family="Consolas, monospace" font-size="9.5" opacity=".7">SMS</text>
+            <rect x="660" y="190" width="40" height="14" rx="7" fill="#9A6E28" opacity=".5"/>
+            <rect x="700" y="190" width="166" height="14" rx="7" fill="#A02828" opacity=".35"/>
+            <text x="874" y="201" font-size="9.5" text-anchor="end" opacity="0"></text>
+          </g>
+
+          <!-- recipient escalation -->
+          <g font-size="10.5">
+            <text x="24" y="238" font-family="Consolas, monospace" font-size="9.5" opacity=".7">TO</text>
+            <rect x="60"  y="226" width="440" height="16" rx="2" fill="currentColor" opacity=".10"/>
+            <text x="70"  y="238" font-size="10">Document Owner + Backup Owner + Dept Owner</text>
+            <rect x="500" y="226" width="160" height="16" rx="2" fill="#A8690B" opacity=".22"/>
+            <text x="510" y="238" font-size="10">+ Escalation Mgr</text>
+            <rect x="660" y="226" width="206" height="16" rx="2" fill="#A02828" opacity=".22"/>
+            <text x="708" y="238" font-size="10">+ Executive Sponsor</text>
+          </g>
+
+          <text x="40" y="278" font-size="10.5" opacity=".8">Ladders are per document type. GOSI (90-day validity) uses 30/14/7/3/1; ISO certificates (3-year) use 180/120/90/60/30/14.</text>
+          <text x="40" y="292" font-size="10.5" opacity=".8">Every send is guarded by an idempotency key, so a re-run of the flow sends nothing.</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption><strong>Figure 4.</strong> SMS activates only inside the last seven days and while overdue. Using it earlier would make it ordinary, and an ordinary SMS alert is an ignored one.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ══════════════ §7 ══════════════ -->
+  <section id="s7">
+    <div class="sec-head">
+      <div class="sec-num">§ 07</div>
+      <h2>Security &amp; compliance<span class="h2-ar">الأمن والامتثال التنظيمي</span></h2>
+    </div>
+
+    <p class="lede-ar">الامتثال الأهم لشركة سعودية ليس GDPR بل <strong>نظام حماية البيانات الشخصية السعودي (PDPL)</strong> الصادر عن سدايا — وهو نافذ ومُطبّق فعلياً، بغرامات تصل إلى 5 ملايين ريال قابلة للمضاعفة عند التكرار.</p>
+
+    <h3>Regulatory frame — Saudi first</h3>
+    <p>The organisation is a Saudi entity. The binding regime is the <strong>Personal Data Protection Law (PDPL)</strong>, enforced by SDAIA. It became fully enforceable on 14 September 2024 and is now in an active enforcement phase, with penalties up to <strong>SAR 5 million</strong>, doubled for repeat violations. GDPR applies only where EU personal data is in scope — treat it as secondary, not primary.</p>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Requirement</th><th>Source</th><th>How EDMS satisfies it</th></tr></thead>
+        <tbody>
+          <tr><td>Breach notification within <strong>72 hours</strong></td><td>PDPL</td><td>Purview alert policy → Teams escalation → documented runbook, rehearsed as test G10</td></tr>
+          <tr><td>DPO appointed and registered on the National Data Governance Platform</td><td>PDPL</td><td>Required where sensitive data is processed at scale or transferred cross-border. <span class="chip warn">action for Legal</span></td></tr>
+          <tr><td>Cross-border transfer mechanism</td><td>PDPL</td><td>SDAIA has published no adequacy list, so transfers need approved SCCs or BCRs. <strong>Confirm the M365 tenant's data region</strong> — if not in KSA, this applies to the whole system</td></tr>
+          <tr><td>Data subject rights: access, correct, delete, object, port</td><td>PDPL</td><td>Registry is queryable by person field; export routine defined in test G09</td></tr>
+          <tr><td>Records of processing</td><td>PDPL</td><td><code>EDMS_AuditLog</code> + Purview Unified Audit Log</td></tr>
+          <tr><td>Control of documented information — approval before issue, review, version identification, prevention of obsolete use</td><td>ISO 9001:2015 §7.5.3</td><td>Approval chain (§5), <code>LastReviewedOn</code>, <code>VersionLabel</code>, <code>Superseded</code> state. Each document type carries its <code>ISOClause</code> reference</td></tr>
+          <tr><td>Access control, cryptography, logging, backup</td><td>ISO 27001 Annex A 5.15, 8.24, 8.15, 8.13</td><td>Entra + Conditional Access, Microsoft-managed AES-256 + TLS 1.2+, Purview audit, M365 Backup</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Control stack</h3>
+    <div class="two">
+      <div>
+        <h4>Data protection</h4>
+        <ul>
+          <li><strong>In transit:</strong> TLS 1.2+ enforced tenant-wide; legacy protocols disabled</li>
+          <li><strong>At rest:</strong> BitLocker volume + per-file AES-256, Microsoft-managed keys. <em>Customer Key via Azure Key Vault only if Legal requires key custody</em></li>
+          <li><strong>Sensitivity labels:</strong> Public / Internal / Confidential / Restricted, inherited from the document <em>type</em>. Confidential and above get encryption + watermark</li>
+          <li><strong>DLP:</strong> block external sharing of Confidential+; policy tips shown at the point of action, not after</li>
+          <li><strong>Conditional Access:</strong> MFA always; block download on unmanaged devices for Restricted</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Resilience</h4>
+        <ul>
+          <li><strong>RPO ≤ 1 hour, RTO ≤ 4 hours</strong> — both rehearsed, not assumed</li>
+          <li>Native recycle bin gives 93 days and is <strong>not a backup</strong>. A dedicated backup product is a line item, not an optional extra</li>
+          <li>Restore drills quarterly: single item, single file version, full site</li>
+          <li>A failed backup job raises an alert within one hour — an unmonitored backup is a belief, not a control</li>
+          <li>Ransomware path tested via Defender detection + restore drill</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ §8 ══════════════ -->
+  <section id="s8">
+    <div class="sec-head">
+      <div class="sec-num">§ 08</div>
+      <h2>Seven defects that kill SharePoint document trackers<span class="h2-ar">سبعة أعطال تُفشل أنظمة تتبّع الوثائق</span></h2>
+    </div>
+
+    <p>Every one of these has been the root cause of a real expiry going unnoticed. They are listed here because the design decisions in §2–§6 exist specifically to prevent them, and a reviewer should be able to check each one off.</p>
+
+    <div class="defects">
+      <div class="defect">
+        <div class="dh"><span class="dn">01</span><span class="dt">The frozen <code>Today()</code></span></div>
+        <p class="db">A calculated column <code>= ExpiryDate − Today()</code> evaluates only when the item is written. The value silently freezes and drifts further from reality every day. Nothing errors; the column just quietly lies.</p>
+        <p class="df"><b>Prevented by</b> Flow 01 stamps <code>DaysToExpire</code> nightly. Power BI recomputes independently and raises an alarm on any disagreement (§9 <code>Flow Health</code>).</p>
+      </div>
+
+      <div class="defect">
+        <div class="dh"><span class="dn">02</span><span class="dt">Duplicate alert storms</span></div>
+        <p class="db">Recurrence flows double-fire on service retries and manual re-runs. Two hundred people get the same alert twice, learn the system cries wolf, and create a mailbox rule. The system is then dead while still appearing to work.</p>
+        <p class="df"><b>Prevented by</b> <code>NotificationLog.IdempotencyKey</code> = item + tier + date, checked before every send.</p>
+      </div>
+
+      <div class="defect">
+        <div class="dh"><span class="dn">03</span><span class="dt">Silent flow death</span></div>
+        <p class="db">A flow gets disabled by a licence lapse, an owner leaving, or a connection expiring. No alert fires because the thing that fires alerts is the thing that died. Discovery is typically weeks later, via a lapsed licence.</p>
+        <p class="df"><b>Prevented by</b> Flow 09 watchdog: escalates if no run summary in 26 hours. Plus the <code>Flow Health</code> measure on the dashboard.</p>
+      </div>
+
+      <div class="defect">
+        <div class="dh"><span class="dn">04</span><span class="dt">Version history explosion</span></div>
+        <p class="db">A nightly job that writes every row generates 5,000 versions a day — 1.8 million a year. It destroys <code>Modified By</code> as a signal, bloats storage, and eventually hits the 50,000-versions-per-item ceiling.</p>
+        <p class="df"><b>Prevented by</b> Flow 01 writes only when a value actually changed. Correctness requirement, not an optimisation.</p>
+      </div>
+
+      <div class="defect">
+        <div class="dh"><span class="dn">05</span><span class="dt">The 5,000-item view threshold</span></div>
+        <p class="db">A list happily holds 30 million items, but any <em>view</em> that filters or sorts on an unindexed column fails past 5,000. It works perfectly in testing with 200 rows and breaks in production two years later.</p>
+        <p class="df"><b>Prevented by</b> Nine indexed columns; every shipped view filters and sorts on one. Verified at 6,000 items in tests A07–A08.</p>
+      </div>
+
+      <div class="defect">
+        <div class="dh"><span class="dn">06</span><span class="dt">Recycle bin as backup</span></div>
+        <p class="db">93 days of recycle bin plus Microsoft's own short retention is not a backup policy. It does not survive a deliberate purge, a rogue script, or a discovery made in month four.</p>
+        <p class="df"><b>Prevented by</b> A dedicated backup product with rehearsed RPO/RTO. Test H02 exists specifically to prove native retention is insufficient.</p>
+      </div>
+
+      <div class="defect">
+        <div class="dh"><span class="dn">07</span><span class="dt">Item-level permission sprawl</span></div>
+        <p class="db">Breaking inheritance per document feels like precision. Past ~5,000 unique permissions, list rendering, search indexing, and every permission write slow to a crawl, and nobody can answer "who can see this?".</p>
+        <p class="df"><b>Prevented by</b> Metadata open, files partitioned by department folder and security group. Permission count scales with departments, not documents.</p>
+      </div>
+    </div>
+
+    <div class="note hazard">
+      <span class="nt">The meta-defect</span>
+      <p>All seven share a shape: <strong>the system continues to look healthy while it has stopped working.</strong> A green dashboard fed by stale data is worse than no dashboard, because it actively prevents the question from being asked. That is why <code>Flow Health</code> is on the dashboard next to the compliance score, and why the watchdog is flow 09 rather than a nice-to-have.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════ §9 ══════════════ -->
+  <section id="s9">
+    <div class="sec-head">
+      <div class="sec-num">§ 09</div>
+      <h2>Cost model<span class="h2-ar">نموذج التكلفة والتراخيص</span></h2>
+    </div>
+
+    <p>Adjust the sliders to match your own headcount. The figures use Microsoft's published US list prices at September 2026 — <strong>KSA pricing through a CSP partner will differ</strong>, so treat the output as a budgeting envelope and confirm with your reseller before committing.</p>
+
+    <div class="calc">
+      <div class="calc-grid">
+        <div class="calc-in">
+          <div class="ctl">
+            <div class="ctl-top"><label for="cUsers">Total staff using the system</label><output id="oUsers">200</output></div>
+            <input type="range" id="cUsers" min="25" max="500" step="25" value="200">
+            <p class="hint">No licence cost — read and edit run on Microsoft 365 seeded rights.</p>
+          </div>
+          <div class="ctl">
+            <div class="ctl-top"><label for="cApps">Power Apps Premium seats</label><output id="oApps">0</output></div>
+            <input type="range" id="cApps" min="0" max="60" step="5" value="0">
+            <p class="hint">Only needed for a standalone canvas app. Zero in Phase 1 — customised SharePoint forms are seeded. $20/user/mo.</p>
+          </div>
+          <div class="ctl">
+            <div class="ctl-top"><label for="cBI">Power BI Pro seats</label><output id="oBI">30</output></div>
+            <input type="range" id="cBI" min="0" max="120" step="5" value="30">
+            <p class="hint">Authors plus dashboard viewers. $14/user/mo.</p>
+          </div>
+          <div class="ctl">
+            <div class="ctl-top"><label for="cBackup">Backup volume</label><output id="oBackup">200 GB</output></div>
+            <input type="range" id="cBackup" min="0" max="2000" step="50" value="200">
+            <p class="hint">Estimated at $0.15/GB/mo — confirm the current rate with your partner.</p>
+          </div>
+          <div>
+            <h4 style="margin-top:0">Modules</h4>
+            <div class="toggles">
+              <label class="tg"><input type="checkbox" id="cProc" checked> Premium automation lane <span class="chip brass">$150/mo</span></label>
+              <label class="tg"><input type="checkbox" id="cSms" checked> SMS alerts</label>
+              <label class="tg"><input type="checkbox" id="cSign"> eSignature</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="calc-out">
+          <div class="co-total" id="oAnnual">$0</div>
+          <div class="co-sub">recurring per year</div>
+          <div class="co-line" id="lProc"><span>Power Automate Process ×1</span><span class="cv" id="vProc">$0</span></div>
+          <div class="co-line" id="lApps"><span>Power Apps Premium</span><span class="cv" id="vApps">$0</span></div>
+          <div class="co-line" id="lBI"><span>Power BI Pro</span><span class="cv" id="vBI">$0</span></div>
+          <div class="co-line" id="lBackup"><span>Backup storage</span><span class="cv" id="vBackup">$0</span></div>
+          <div class="co-line" id="lSms"><span>SMS (≈2,000 segments)</span><span class="cv" id="vSms">$0</span></div>
+          <div class="co-line" id="lSign"><span>eSignature (≈200 envelopes)</span><span class="cv" id="vSign">$0</span></div>
+          <div class="co-foot">
+            Per user, per month: <b id="oPUPM">$0</b><br>
+            A commercial DMS at SAR 60/user/mo would cost <b id="oAlt">$0</b>/yr for the same headcount.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>One-time implementation</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Approach</th><th class="num">Effort</th><th class="num">Cost</th><th>When it makes sense</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Internal build</strong><br><span style="font-size:12px;color:var(--ink-3)">Saleh + one IT resource, part-time</span></td>
+            <td class="num">≈ 420 h<br><span style="font-size:11px;color:var(--ink-3)">over 16 weeks</span></td>
+            <td class="num">Salary only</td>
+            <td>The organisation keeps the knowledge; the scripts in this pack remove most of the build risk. Slower calendar, near-zero cash.</td>
+          </tr>
+          <tr>
+            <td><strong>Partner-led</strong><br><span style="font-size:12px;color:var(--ink-3)">KSA Microsoft partner</span></td>
+            <td class="num">≈ 55 days</td>
+            <td class="num">SAR 165k–275k<br><span style="font-size:11px;color:var(--ink-3)">≈ $44k–73k</span></td>
+            <td>Faster, warrantied, but the operating knowledge leaves with the consultant unless handover is contractual.</td>
+          </tr>
+          <tr>
+            <td><strong>Hybrid</strong> <span class="chip acc">recommended</span></td>
+            <td class="num">≈ 20 partner days<br>+ 250 h internal</td>
+            <td class="num">SAR 60k–100k<br><span style="font-size:11px;color:var(--ink-3)">≈ $16k–27k</span></td>
+            <td>Partner does security hardening, Purview configuration and the Power BI model; internal team does lists, flows, migration and owns it afterwards.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══════════════ §10 ══════════════ -->
+  <section id="s10">
+    <div class="sec-head">
+      <div class="sec-num">§ 10</div>
+      <h2>Delivery plan<span class="h2-ar">خطة التنفيذ الزمنية</span></h2>
+    </div>
+
+    <p>Sixteen weeks, seven phases. The two weeks of shadow running at the end are not contingency — they are the acceptance test.</p>
+
+    <div class="tw">
+      <div class="gantt">
+        <div class="g-lab"><span class="gp">PHASE 0</span><span class="gn">Discovery &amp; audit</span></div>
+        <div class="g-track"><div class="g-bar" style="left:0%;width:12.5%"><span>W1–2</span></div></div>
+
+        <div class="g-lab"><span class="gp">PHASE 1</span><span class="gn">Foundation &amp; migration</span></div>
+        <div class="g-track"><div class="g-bar" style="left:12.5%;width:18.75%"><span>W3–5</span></div></div>
+
+        <div class="g-lab"><span class="gp">PHASE 2</span><span class="gn">Automation</span></div>
+        <div class="g-track"><div class="g-bar" style="left:31.25%;width:18.75%"><span>W6–8</span></div></div>
+
+        <div class="g-lab"><span class="gp">PHASE 3</span><span class="gn">Experience layer</span></div>
+        <div class="g-track"><div class="g-bar" style="left:50%;width:12.5%"><span>W9–10</span></div></div>
+
+        <div class="g-lab"><span class="gp">PHASE 4</span><span class="gn">Power BI &amp; KPIs</span></div>
+        <div class="g-track"><div class="g-bar" style="left:62.5%;width:12.5%"><span>W11–12</span></div></div>
+
+        <div class="g-lab"><span class="gp">PHASE 5</span><span class="gn">Security hardening</span></div>
+        <div class="g-track"><div class="g-bar" style="left:75%;width:12.5%"><span>W13–14</span></div></div>
+
+        <div class="g-lab"><span class="gp">PHASE 6</span><span class="gn">UAT, shadow run, go-live</span></div>
+        <div class="g-track"><div class="g-bar" style="left:87.5%;width:12.5%;background:var(--brass)"><span>W15–16</span></div></div>
+
+        <div></div>
+        <div class="g-scale">
+          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+          <span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>Phase gates</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Phase</th><th>Exit criterion — nothing proceeds until this is true</th></tr></thead>
+        <tbody>
+          <tr><td><strong>0 · Discovery</strong></td><td>Every document type catalogued with its validity, mandatory flag and issuing authority. Legal has confirmed the tenant's data region and whether a DPO registration is required.</td></tr>
+          <tr><td><strong>1 · Foundation</strong></td><td>Migration dry run returns <strong>zero</strong> <code>ERROR</code>-severity exceptions. Source rows = migrated + skipped + errored, balanced exactly.</td></tr>
+          <tr><td><strong>2 · Automation</strong></td><td>Flow 01 runs twice in one day and updates zero items on the second run. Flow 02 re-run sends zero duplicates.</td></tr>
+          <tr><td><strong>3 · Experience</strong></td><td>Arabic renders RTL correctly in Outlook desktop, OWA and iOS Mail. Filtered views render under 3 s at 6,000 items.</td></tr>
+          <tr><td><strong>4 · Intelligence</strong></td><td>RLS verified with "View as role" for every department. <code>DaysToExpire</code> matches the DAX recomputation for 100% of rows.</td></tr>
+          <tr><td><strong>5 · Hardening</strong></td><td>Restore drill meets RTO ≤ 4 h. Compliance Officer confirmed unable to delete. DLP blocks an external share attempt.</td></tr>
+          <tr><td><strong>6 · Go-live</strong></td><td>Two full weeks of shadow running against the legacy list with <strong>zero missed expiries</strong>. All P1 tests pass. Rollback rehearsed.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Deliverables in this pack</h3>
+    <div class="deliverables">
+      <div class="dlv"><div class="dk">PowerShell</div><div class="dv"><code>01-Provision-EDMS.ps1</code> — idempotent site, list, column, index, view and role provisioning with seed data</div></div>
+      <div class="dlv"><div class="dk">PowerShell</div><div class="dv"><code>02-Migrate-OfficialDocuments.ps1</code> — dry-run migration with date normalisation, lookup resolution and an exception report</div></div>
+      <div class="dlv"><div class="dk">Markdown</div><div class="dv"><code>FLOW-SPECIFICATIONS.md</code> — nine flows with exact expressions, idempotency pattern and error-handling standard</div></div>
+      <div class="dlv"><div class="dk">JSON</div><div class="dv"><code>03-Column-Formatting.json</code> — status pills, data bars, risk rails and quick actions</div></div>
+      <div class="dlv"><div class="dk">DAX</div><div class="dv"><code>04-PowerBI-Measures.dax</code> — health score, governance gaps, renewal SLA and flow-health measures</div></div>
+      <div class="dlv"><div class="dk">Markdown</div><div class="dv"><code>05-Test-Plan.md</code> — 94 cases across 9 suites with go/no-go thresholds</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════ §11 ══════════════ -->
+  <section id="s11">
+    <div class="sec-head">
+      <div class="sec-num">§ 11</div>
+      <h2>Risks &amp; open decisions<span class="h2-ar">المخاطر والقرارات المعلّقة</span></h2>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Adoption collapse</strong> — owners keep their own spreadsheets in parallel</td>
+            <td><span class="chip crit">high</span></td><td><span class="chip crit">high</span></td>
+            <td>The weekly digest names the owner of every gap. Visibility is the enforcement mechanism; a dashboard nobody is named on changes nothing.</td>
+          </tr>
+          <tr>
+            <td><strong>Migration data defects</strong> become "the data was always wrong"</td>
+            <td><span class="chip warn">medium</span></td><td><span class="chip crit">high</span></td>
+            <td>Dry run first, zero <code>ERROR</code> exceptions as a hard gate, 20-row manual spot check, two-week shadow run.</td>
+          </tr>
+          <tr>
+            <td><strong>Flow owner leaves</strong> and every flow stops</td>
+            <td><span class="chip warn">medium</span></td><td><span class="chip crit">high</span></td>
+            <td>All flows owned by <code>svc-edms-automation</code>, a licensed service account, never by a person. Two named co-owners.</td>
+          </tr>
+          <tr>
+            <td><strong>Licence surprise</strong> — a premium connector sneaks into a "free" flow</td>
+            <td><span class="chip warn">medium</span></td><td><span class="chip warn">medium</span></td>
+            <td>DLP policy in the Power Platform admin centre blocks premium connectors in the default environment. Premium work only happens in the isolated lane.</td>
+          </tr>
+          <tr>
+            <td><strong>IT-managed device restrictions</strong> block PnP PowerShell or the Entra app registration</td>
+            <td><span class="chip warn">medium</span></td><td><span class="chip warn">medium</span></td>
+            <td>Raise the app-registration request with IT in week 1. Fallback: provision lists manually from the schema in §3 — slower, same result.</td>
+          </tr>
+          <tr>
+            <td><strong>Tenant data region outside KSA</strong> triggers cross-border transfer obligations</td>
+            <td><span class="chip acc">unknown</span></td><td><span class="chip crit">high</span></td>
+            <td><strong>Confirm in week 1.</strong> If outside KSA, SCCs or BCRs approved by SDAIA are required before go-live, not after.</td>
+          </tr>
+          <tr>
+            <td><strong>Outgrowing SharePoint</strong></td>
+            <td><span class="chip mute">low</span></td><td><span class="chip warn">medium</span></td>
+            <td>Migration trigger defined below. Reviewed quarterly against real numbers, not opinion.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <span class="nt">Dataverse migration trigger</span>
+      <p>Move off SharePoint Lists when <strong>any two</strong> of these become true: registry exceeds <strong>100,000 items</strong>; more than <strong>50 concurrent editors</strong> at peak; a genuine need for row-level security on metadata rather than files; or more than three additional entities with real referential integrity requirements. Until then, Dataverse is $48,000 a year of capability that would go unused.</p>
+    </div>
+
+    <h3>Decisions needed before week 1</h3>
+    <ol>
+      <li><strong>Tenant data region</strong> — KSA or elsewhere. Determines whether PDPL cross-border machinery applies to the whole system.</li>
+      <li><strong>Backup product</strong> — Microsoft 365 Backup, or a third party (Veeam, AvePoint). Affects the cost model and the RTO commitment.</li>
+      <li><strong>eSignature</strong> — SharePoint eSignature (in-tenant, cheaper, weaker external standing) or Adobe/DocuSign (premium, stronger for counterparties).</li>
+      <li><strong>Build model</strong> — internal, partner-led, or hybrid. Determines the calendar more than anything else in this document.</li>
+      <li><strong>Executive sponsor</strong> — the escalation ladder terminates somewhere. Who is at the top, by name.</li>
+    </ol>
+  </section>
+
+  <footer>
+    <p><strong>EDMS System Design Specification v1.0</strong> · Riyadh, Saudi Arabia · 12 September 2026.</p>
+    <p>Licence prices are Microsoft published US list rates as at September 2026 and are indicative only; KSA CSP pricing differs. Backup and eSignature rates are estimates requiring partner confirmation. PDPL guidance summarises publicly available material and is not legal advice — confirm obligations with counsel and your DPO.</p>
+  </footer>
+
+  </main>
+</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ── cost calculator ─────────────────────────────────────────────────── */
+  var PRICE = {
+    apps:    20,     // Power Apps Premium, user/month
+    bi:      14,     // Power BI Pro, user/month
+    process: 150,    // Power Automate Process, bot/month
+    backup:  0.15,   // per GB/month (estimate)
+    smsYear: 80,     // ~2,000 Arabic segments/yr (estimate)
+    signYear: 400,   // ~200 envelopes/yr at ~$2 (estimate)
+    altSarPerUserMonth: 60,
+    sarPerUsd: 3.75
+  };
+
+  var el = function (id) { return document.getElementById(id); };
+  var money = function (n) {
+    return "$" + Math.round(n).toLocaleString("en-US");
+  };
+
+  var inputs = ["cUsers", "cApps", "cBI", "cBackup", "cProc", "cSms", "cSign"].map(el);
+
+  function recalc() {
+    var users  = +el("cUsers").value;
+    var apps   = +el("cApps").value;
+    var bi     = +el("cBI").value;
+    var gb     = +el("cBackup").value;
+    var proc   = el("cProc").checked;
+    var sms    = el("cSms").checked;
+    var sign   = el("cSign").checked;
+
+    el("oUsers").textContent  = users;
+    el("oApps").textContent   = apps;
+    el("oBI").textContent     = bi;
+    el("oBackup").textContent = gb + " GB";
+
+    var yProc   = proc ? PRICE.process * 12 : 0;
+    var yApps   = apps * PRICE.apps * 12;
+    var yBI     = bi * PRICE.bi * 12;
+    var yBackup = gb * PRICE.backup * 12;
+    var ySms    = sms ? PRICE.smsYear : 0;
+    var ySign   = sign ? PRICE.signYear : 0;
+
+    var total = yProc + yApps + yBI + yBackup + ySms + ySign;
+
+    el("vProc").textContent   = money(yProc);
+    el("vApps").textContent   = money(yApps);
+    el("vBI").textContent     = money(yBI);
+    el("vBackup").textContent = money(yBackup);
+    el("vSms").textContent    = money(ySms);
+    el("vSign").textContent   = money(ySign);
+
+    el("lProc").classList.toggle("off", yProc === 0);
+    el("lApps").classList.toggle("off", yApps === 0);
+    el("lBI").classList.toggle("off", yBI === 0);
+    el("lBackup").classList.toggle("off", yBackup === 0);
+    el("lSms").classList.toggle("off", ySms === 0);
+    el("lSign").classList.toggle("off", ySign === 0);
+
+    el("oAnnual").textContent = money(total);
+    el("oPUPM").textContent   = "$" + (total / users / 12).toFixed(2);
+
+    var altYear = users * PRICE.altSarPerUserMonth * 12 / PRICE.sarPerUsd;
+    el("oAlt").textContent = money(altYear);
+  }
+
+  inputs.forEach(function (i) {
+    if (i) { i.addEventListener("input", recalc); i.addEventListener("change", recalc); }
+  });
+  recalc();
+
+  /* ── section index highlighting ──────────────────────────────────────── */
+  var links = Array.prototype.slice.call(document.querySelectorAll(".rail a"));
+  var secs  = links.map(function (a) { return document.querySelector(a.getAttribute("href")); });
+
+  function mark() {
+    var best = 0, y = window.scrollY + 120;
+    secs.forEach(function (s, i) { if (s && s.offsetTop <= y) { best = i; } });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === best); });
+  }
+
+  var ticking = false;
+  window.addEventListener("scroll", function () {
+    if (ticking) { return; }
+    ticking = true;
+    window.requestAnimationFrame(function () { mark(); ticking = false; });
+  }, { passive: true });
+  mark();
+})();
+</script>
+
+</body>
+</html>

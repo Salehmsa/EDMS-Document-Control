@@ -1,0 +1,147 @@
+/* ============================================================================
+   EDMS — SharePoint JSON column & view formatting
+   Apply via: List settings ▸ Column ▸ Format this column ▸ Advanced mode
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   1. DocStatus — status pill
+   Column: DocStatus (Choice)
+   --------------------------------------------------------------------------- */
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "elmType": "div",
+  "style": {
+    "display": "inline-flex",
+    "align-items": "center",
+    "gap": "6px",
+    "padding": "3px 10px",
+    "border-radius": "12px",
+    "font-weight": "600",
+    "font-size": "12px",
+    "background-color": "=if(@currentField == 'Expired', '#FDE7E9', if(@currentField == 'Expiring Soon', '#FFF4CE', if(@currentField == 'Valid', '#DFF6DD', if(@currentField == 'Under Renewal', '#E5F3FF', if(@currentField == 'Pending Approval', '#F3E8FF', '#F3F2F1')))))",
+    "color": "=if(@currentField == 'Expired', '#A4262C', if(@currentField == 'Expiring Soon', '#8A6100', if(@currentField == 'Valid', '#0B6A0B', if(@currentField == 'Under Renewal', '#005A9E', if(@currentField == 'Pending Approval', '#5C2E91', '#605E5C')))))"
+  },
+  "children": [
+    {
+      "elmType": "span",
+      "attributes": {
+        "iconName": "=if(@currentField == 'Expired', 'ErrorBadge', if(@currentField == 'Expiring Soon', 'Warning', if(@currentField == 'Valid', 'CompletedSolid', if(@currentField == 'Under Renewal', 'SyncStatus', if(@currentField == 'Pending Approval', 'Clock', 'CircleRing')))))"
+      },
+      "style": { "font-size": "13px" }
+    },
+    { "elmType": "span", "txtContent": "@currentField" }
+  ]
+}
+
+
+/* ---------------------------------------------------------------------------
+   2. DaysToExpire — data bar with numeric label
+   Column: DaysToExpire (Number)
+   Bar length is capped at 180 days so short-fuse items stay readable.
+   --------------------------------------------------------------------------- */
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "elmType": "div",
+  "style": { "display": "flex", "align-items": "center", "gap": "8px" },
+  "children": [
+    {
+      "elmType": "div",
+      "style": {
+        "width": "70px",
+        "height": "8px",
+        "border-radius": "4px",
+        "background-color": "#EDEBE9",
+        "overflow": "hidden"
+      },
+      "children": [
+        {
+          "elmType": "div",
+          "style": {
+            "height": "8px",
+            "border-radius": "4px",
+            "width": "=if(@currentField < 0, '100%', (if(@currentField > 180, 180, @currentField) / 180 * 100) + '%')",
+            "background-color": "=if(@currentField < 0, '#A4262C', if(@currentField <= 30, '#D13438', if(@currentField <= 90, '#F7A700', '#107C10')))"
+          }
+        }
+      ]
+    },
+    {
+      "elmType": "span",
+      "txtContent": "=if(@currentField < 0, 'overdue ' + abs(@currentField) + 'd', @currentField + 'd')",
+      "style": {
+        "font-weight": "=if(@currentField <= 30, '700', '400')",
+        "color": "=if(@currentField < 0, '#A4262C', if(@currentField <= 30, '#D13438', '#323130'))",
+        "font-size": "12px",
+        "min-width": "72px"
+      }
+    }
+  ]
+}
+
+
+/* ---------------------------------------------------------------------------
+   3. Row-level view formatting — left accent bar by risk band
+   Apply via: View ▸ Format current view ▸ Advanced mode
+   --------------------------------------------------------------------------- */
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/row-formatting.schema.json",
+  "additionalRowClass": "=if([$RiskBand] == 'Black', 'sp-row-danger', if([$RiskBand] == 'Red', 'sp-row-warning', ''))",
+  "attributes": {
+    "class": "=if([$IsMandatoryDoc] == true && [$DaysToExpire] < 0, 'ms-bgColor-red ms-fontColor-white', '')"
+  },
+  "rowFormatter": {
+    "elmType": "div",
+    "style": {
+      "border-left": "=if([$RiskBand] == 'Black', '4px solid #A4262C', if([$RiskBand] == 'Red', '4px solid #D13438', if([$RiskBand] == 'Amber', '4px solid #F7A700', '4px solid #107C10')))",
+      "padding-left": "8px"
+    },
+    "children": [ { "elmType": "div", "forEach": "field in [$FieldNames]" } ]
+  }
+}
+
+
+/* ---------------------------------------------------------------------------
+   4. Title — document name with a "Start Renewal" quick action
+   Column: Title (Text)
+   Replace <SITEURL> and <FLOWID> before applying.
+   --------------------------------------------------------------------------- */
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "elmType": "div",
+  "style": { "display": "flex", "align-items": "center", "gap": "8px" },
+  "children": [
+    {
+      "elmType": "a",
+      "txtContent": "@currentField",
+      "attributes": {
+        "href": "='<SITEURL>/Lists/EDMS_DocumentRegistry/DispForm.aspx?ID=' + [$ID]",
+        "target": "_blank"
+      },
+      "style": { "font-weight": "600", "text-decoration": "none" }
+    },
+    {
+      "elmType": "button",
+      "customRowAction": { "action": "executeFlow", "actionParams": "{\"id\": \"<FLOWID>\"}" },
+      "attributes": { "class": "ms-fontColor-themePrimary", "title": "Start renewal" },
+      "style": {
+        "border": "none",
+        "background": "transparent",
+        "cursor": "pointer",
+        "display": "=if([$DaysToExpire] <= 90 && [$DocStatus] != 'Under Renewal', 'inline', 'none')"
+      },
+      "children": [ { "elmType": "span", "attributes": { "iconName": "Refresh" } } ]
+    }
+  ]
+}
+
+
+/* ---------------------------------------------------------------------------
+   5. IsMandatoryDoc — compliance-critical marker
+   Column: IsMandatoryDoc (Yes/No)
+   --------------------------------------------------------------------------- */
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "elmType": "span",
+  "attributes": { "iconName": "=if(@currentField == true, 'Shield', '')", "title": "=if(@currentField == true, 'Legally mandatory — lapse carries regulatory exposure', '')" },
+  "style": { "color": "#A4262C", "font-size": "15px" }
+}

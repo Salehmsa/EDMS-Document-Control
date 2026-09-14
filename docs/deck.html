@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EDMS — Executive Deck</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   EDMS executive deck — self-contained, offline, no dependencies.
+   Palette and motif match the PowerPoint: navy ground, registry blue,
+   brass seal. Slides are fixed 16:9 boxes scaled to the viewport, so
+   nothing reflows between screens or projectors.
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --navy:#14243F; --blue:#1F4E86; --brass:#B0813A;
+  --ice:#CBD8EA; --paper:#F4F6F9; --white:#FFFFFF;
+  --ink:#161B22; --mute:#5D6875; --line:#DCE2EA; --sunk:#E5EAF0;
+  --ok:#2C6E3C; --warn:#B5730C; --crit:#A02828;
+  --serif:"Cambria",Georgia,"Times New Roman",serif;
+  --sans:"Segoe UI","Segoe UI Arabic",system-ui,-apple-system,Arial,sans-serif;
+  --mono:"Consolas",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0A0F18;
+  font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+
+/* stage: a fixed 1280×720 slide scaled to fit */
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#scaler{width:1280px;height:720px;position:relative;transform-origin:center center;
+  box-shadow:0 20px 70px -20px rgba(0,0,0,.8)}
+.slide{position:absolute;inset:0;background:var(--paper);padding:46px 54px;display:none;
+  flex-direction:column;overflow:hidden}
+.slide.on{display:flex}
+.slide.dark{background:var(--navy);color:var(--white)}
+
+/* chrome */
+#bar{position:fixed;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.10);z-index:20}
+#barfill{height:100%;background:var(--brass);width:0;transition:width .25s}
+#hud{position:fixed;bottom:14px;right:16px;display:flex;gap:6px;align-items:center;z-index:21;
+  font-family:var(--mono);font-size:11px;color:#7E8DA3}
+#hud button{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#B9C6D8;
+  border-radius:4px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:var(--mono)}
+#hud button:hover{background:rgba(255,255,255,.15);color:#fff}
+#count{padding:4px 8px;font-variant-numeric:tabular-nums}
+#notes{position:fixed;left:0;right:0;bottom:0;max-height:38vh;overflow-y:auto;z-index:22;
+  background:#0F1621;border-top:2px solid var(--brass);padding:14px 20px 20px;color:#C8D3E2;
+  font-size:14px;line-height:1.6;display:none}
+#notes.on{display:block}
+#notes b{color:var(--brass);font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;display:block;margin-bottom:6px}
+.zone{position:fixed;top:0;bottom:0;width:14%;z-index:15;cursor:pointer}
+.zone.l{left:0}.zone.r{right:0}
+
+/* slide furniture */
+.kick{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;color:var(--brass)}
+h1{font-family:var(--serif);font-size:34px;font-weight:700;margin:6px 0 0;line-height:1.12;color:var(--navy)}
+.dark h1{color:var(--white)}
+.ar{font-size:14px;color:var(--mute);direction:rtl;position:absolute;top:46px;right:54px}
+.dark .ar{color:#8A9AB0}
+.body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;margin-top:14px;min-height:0}
+.foot{font-size:12.5px;font-style:italic;color:var(--blue);margin-top:12px}
+.dark .foot{color:#8A9AB0;font-style:normal}
+
+/* the motif: an embossed seal */
+.seal{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;
+  background:var(--brass);color:#fff;font-weight:700;flex:none}
+.seal.s{width:26px;height:26px;font-size:12px}
+.seal.m{width:32px;height:32px;font-size:13px}
+.seal.crit{background:var(--crit)}
+.seal.navy{background:var(--navy)}
+
+.card{background:var(--white);border:1px solid var(--line);border-radius:3px;padding:14px 16px;
+  box-shadow:0 1px 2px rgba(21,62,117,.06),0 8px 22px -14px rgba(21,62,117,.3)}
+.row{display:flex;gap:14px;align-items:flex-start}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.tile .v{font-family:var(--serif);font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.tile .k{font-size:11.5px;color:var(--mute);margin-top:7px;line-height:1.35}
+.t{font-weight:600;font-size:14px;color:var(--navy)}
+.dark .t{color:var(--white)}
+.d{font-size:12px;color:var(--mute);line-height:1.45;margin-top:4px}
+.dark .d{color:var(--ice)}
+.chip{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:9px;white-space:nowrap}
+.chip.ok{background:#E0EFE3;color:var(--ok)}
+.chip.warn{background:#FAEEDA;color:var(--warn)}
+.chip.crit{background:#F9E3E3;color:var(--crit)}
+.chip.brass{background:#F7EFDF;color:var(--brass)}
+.chip.acc{background:#E3EAF5;color:var(--blue)}
+
+/* bars / charts */
+.bars{display:flex;flex-direction:column;gap:14px}
+.barrow{display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:center}
+.barrow .lab{font-size:12.5px;line-height:1.3}
+.barwrap{display:flex;align-items:center;gap:10px}
+.barwrap .b{height:30px;border-radius:2px}
+.barwrap .n{font-family:var(--mono);font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+
+@media print{
+  html,body{overflow:visible;height:auto;background:#fff}
+  #stage{position:static;display:block}
+  #scaler{transform:none!important;width:100%;height:auto;box-shadow:none}
+  .slide{display:flex!important;position:relative;inset:auto;width:1280px;height:720px;
+    page-break-after:always;break-after:page}
+  #hud,#bar,#notes,.zone{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<div id="stage"><div id="scaler">
+
+<!-- 1 ─────────────────────────────────────────────── -->
+<section class="slide dark on" data-notes="Opening frame: the register already exists and holds the right fields. What it lacks is control — accurate status, escalation, evidence, audit and retention. This deck asks for approval and a modest budget to add those seven layers.">
+  <div style="position:absolute;right:-90px;top:-150px;width:420px;height:420px;border-radius:50%;background:#1F4E86;opacity:.45"></div>
+  <div style="position:absolute;right:-40px;bottom:-160px;width:300px;height:300px;border-radius:50%;background:#B0813A;opacity:.16"></div>
+  <div class="body" style="justify-content:center;position:relative">
+    <div class="kick">System design specification</div>
+    <div style="font-family:var(--serif);font-size:96px;font-weight:700;line-height:.95;color:#fff;letter-spacing:-.02em">EDMS</div>
+    <div style="font-family:var(--serif);font-size:29px;color:var(--ice);margin-top:-4px">Enterprise Document Management System</div>
+    <div style="font-size:20px;color:var(--ice);direction:rtl;text-align:left">نظام إدارة الوثائق الرسمية المؤسسي</div>
+    <div style="width:230px;height:3px;background:var(--brass);margin:14px 0 6px"></div>
+    <div style="font-size:16px;color:#fff;font-weight:600">Turning an expiry register into a control system.</div>
+    <div style="font-size:16px;color:var(--ice);margin-top:-8px">Built on the Microsoft 365 licences already owned.</div>
+    <div style="font-family:var(--mono);font-size:12px;color:#7E8DA3;margin-top:30px">Version 1.0 · 12 September 2026 · Internal</div>
+  </div>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────── -->
+<section class="slide" data-notes="Three concrete gaps, not a general complaint. The frozen calculated column is the one to dwell on — it is the reason a register can look healthy while being wrong.">
+  <div class="kick">Current state</div><div class="ar">الوضع الراهن</div>
+  <h1>The register works. The control layer does not.</h1>
+  <div class="body">
+    <div class="grid g4">
+      <div class="card tile"><div class="v" style="color:var(--blue)">18</div><div class="k">columns already captured correctly</div></div>
+      <div class="card tile"><div class="v" style="color:var(--crit)">0</div><div class="k">automated alerts firing today</div></div>
+      <div class="card tile"><div class="v" style="color:var(--crit)">0</div><div class="k">approval records that count as evidence</div></div>
+      <div class="card tile"><div class="v" style="color:var(--warn)">93</div><div class="k">days — the only "backup" that exists</div></div>
+    </div>
+    <div class="card">
+      <div style="font-family:var(--serif);font-size:17px;font-weight:700;color:var(--navy);margin-bottom:12px">What a register cannot do on its own</div>
+      <div class="grid" style="gap:11px">
+        <div class="row"><span class="seal s">1</span><div style="flex:1"><span class="t">Days-to-expire is frozen.</span>
+          <span class="d" style="display:inline;margin:0"> A SharePoint calculated column using Today() stops updating the moment the row is last edited. Nothing errors. The column quietly drifts further from reality every day.</span></div></div>
+        <div class="row"><span class="seal s">2</span><div style="flex:1"><span class="t">A single reminder date is not escalation.</span>
+          <span class="d" style="display:inline;margin:0"> One date, one email, one recipient. No widening audience, no second channel, no proof it was ever delivered.</span></div></div>
+        <div class="row"><span class="seal s">3</span><div style="flex:1"><span class="t">A missing document has no row.</span>
+          <span class="d" style="display:inline;margin:0"> The register can only report on what it contains. If an entity must hold a certificate and nobody created the row, the register shows nothing wrong.</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────── -->
+<section class="slide" data-notes="Seven layers, none of which requires a new platform. Layer 7 spans the full width because it is what the executive committee actually sees.">
+  <div class="kick">The proposal</div><div class="ar">المقترح — سبع طبقات</div>
+  <h1>Seven layers on top of what already exists</h1>
+  <div class="body">
+    <div class="grid g2" style="gap:11px">
+      <div class="card row"><span class="seal s">1</span><div><div class="t">Data model</div><div class="d">10 lists. Document type is the policy engine — it carries validity, reminder ladder, approval chain, retention and sensitivity.</div></div></div>
+      <div class="card row"><span class="seal s">2</span><div><div class="t">Status engine</div><div class="d">A nightly flow stamps the real days-to-expire and status, replacing the broken calculated column.</div></div></div>
+      <div class="card row"><span class="seal s">3</span><div><div class="t">Escalating alerts</div><div class="d">A per-type ladder that widens audience and channel as expiry approaches, guarded against duplicate sends.</div></div></div>
+      <div class="card row"><span class="seal s">4</span><div><div class="t">Approval chain</div><div class="d">Sequential, driven by document type, recorded as evidence. Digital signature where an external party must rely on it.</div></div></div>
+      <div class="card row"><span class="seal s">5</span><div><div class="t">Access control</div><div class="d">Six roles — including a compliance officer who can correct but never delete, and delegation that expires by itself.</div></div></div>
+      <div class="card row"><span class="seal s">6</span><div><div class="t">Security &amp; compliance</div><div class="d">Saudi PDPL first, then ISO 9001 clause 7.5.3 and ISO 27001. Labels, DLP, Conditional Access, real backup.</div></div></div>
+    </div>
+    <div class="card row" style="background:var(--navy);border-color:var(--navy)">
+      <span class="seal s" style="background:#fff;color:var(--navy)">7</span>
+      <div><div class="t" style="color:#fff">Executive reporting</div>
+        <div class="d" style="color:var(--ice)">One compliance health score — plus a measure that reveals when the automation itself has stopped running.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────── -->
+<section class="slide" data-notes="The premium lane is the architectural choice that keeps the recurring cost small. Everything else is standard connectors, covered by the seeded licence.">
+  <div class="kick">How it is built</div><div class="ar">البنية التقنية</div>
+  <h1>Architecture — and the one line that controls cost</h1>
+  <div class="body">
+    <div style="display:grid;grid-template-columns:1fr 270px;gap:16px;align-items:start">
+      <div class="grid" style="gap:9px">
+        <div style="display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;background:#CBD8EA;border:1px solid #C3CFDE;border-radius:3px;padding:11px 14px">
+          <b style="font-size:11px;letter-spacing:1.5px;color:var(--blue)">CLIENTS</b><span style="font-size:12.5px">Browser · Teams · Outlook · Mobile · SMS</span></div>
+        <div style="display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;background:#DCE6F3;border:1px solid #C3CFDE;border-radius:3px;padding:11px 14px">
+          <b style="font-size:11px;letter-spacing:1.5px;color:var(--blue)">EXPERIENCE</b><span style="font-size:12.5px">Indexed list views · Formatted forms · Teams tab · Power BI dashboard</span></div>
+        <div style="display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;background:#C9D9EC;border:1px solid #C3CFDE;border-radius:3px;padding:11px 14px">
+          <b style="font-size:11px;letter-spacing:1.5px;color:var(--blue)">AUTOMATION</b><span style="font-size:12.5px">Status engine · Notifications · Approvals · Renewal · Retention · Watchdog</span></div>
+        <div style="display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;background:#B7CCE4;border:1px solid #C3CFDE;border-radius:3px;padding:11px 14px">
+          <b style="font-size:11px;letter-spacing:1.5px;color:var(--blue)">DATA</b><span style="font-size:12.5px">Document registry · 4 reference lists · 5 operational lists · Document library</span></div>
+        <div style="background:#F7EFDF;border:2px solid var(--brass);border-radius:3px;padding:11px 14px">
+          <b style="font-size:11px;letter-spacing:1.5px;color:var(--brass)">PREMIUM LANE</b>
+          <div style="font-size:12.5px;margin-top:3px">Every HTTP-based flow — SMS and eSignature — behind one service account, one licence.</div></div>
+      </div>
+      <div style="background:var(--navy);border-radius:3px;padding:16px;height:100%">
+        <b style="font-size:11px;letter-spacing:1.5px;color:var(--brass)">GOVERNANCE</b>
+        <div style="font-size:11px;font-style:italic;color:#8A9AB0;margin-bottom:10px">spans every layer</div>
+        <div style="font-size:12px;color:var(--ice);line-height:2">Entra ID<br>Conditional Access<br>Sensitivity labels<br>DLP policies<br>Unified Audit Log<br>Retention labels<br>Key Vault<br>Microsoft 365 Backup</div>
+      </div>
+    </div>
+    <div class="foot">Everything above the brass line runs on Microsoft 365 rights already paid for.</div>
+  </div>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────── -->
+<section class="slide" data-notes="This is the slide to linger on with finance. The $34,200 difference is not a discount — it is a design decision, and it is enforced by policy rather than by good intentions.">
+  <div class="kick">Licensing</div><div class="ar">قرار الترخيص</div>
+  <h1>One architectural choice, $34,000 a year</h1>
+  <div class="body">
+    <div style="display:grid;grid-template-columns:1fr 420px;gap:20px;align-items:start">
+      <div class="card">
+        <div class="bars" style="margin:6px 0">
+          <div class="barrow"><div class="lab">Licence every user<br><span style="color:var(--mute);font-size:11.5px">$15 / user / month × 200</span></div>
+            <div class="barwrap"><div class="b" style="width:82%;background:var(--crit)"></div><span class="n" style="color:var(--crit)">$36,000</span></div></div>
+          <div class="barrow"><div class="lab">One Process licence<br><span style="color:var(--mute);font-size:11.5px">$150 / month, unlimited users</span></div>
+            <div class="barwrap"><div class="b" style="width:4.1%;background:var(--ok)"></div><span class="n" style="color:var(--ok)">$1,800</span></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--serif);font-size:18px;font-weight:700;color:var(--navy);margin-bottom:9px">Why this works</div>
+        <div style="font-size:12.5px;line-height:1.55;display:grid;gap:8px">
+          <div>Flows using only SharePoint, Outlook, Teams and Approvals run on rights seeded into Microsoft 365 — no extra licence.</div>
+          <div><b>The moment a flow touches HTTP, it becomes premium.</b></div>
+          <div>A Power Automate Process licence attaches to the flow, not to the person. One licence, unlimited users triggering it.</div>
+          <div>So every premium connector lives in two child flows owned by one service account.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card row" style="background:var(--navy);border-color:var(--navy);align-items:center">
+      <span class="seal m crit">!</span>
+      <div style="font-size:13px;color:var(--ice);line-height:1.5">Intent decays. A Power Platform DLP policy blocks premium connectors in the default environment, so nobody can accidentally add an HTTP action to a seeded flow and create a licence exception six months from now.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────── -->
+<section class="slide" data-notes="Lead with the comparison, not the line items. The commercial SaaS bar is the number a board recognises; the internal bar is what we are asking for.">
+  <div class="kick">Budget</div><div class="ar">التكلفة الإجمالية</div>
+  <h1>Total cost against the alternative</h1>
+  <div class="body">
+    <div style="display:grid;grid-template-columns:1fr 330px;gap:20px;align-items:start">
+      <div class="card">
+        <div class="bars" style="margin:4px 0">
+          <div class="barrow"><div class="lab">EDMS on existing licences</div>
+            <div class="barwrap"><div class="b" style="width:14%;background:var(--ok)"></div><span class="n" style="color:var(--ok)">$7,680</span></div></div>
+          <div class="barrow"><div class="lab">Commercial DMS<br><span style="color:var(--mute);font-size:11.5px">SAR 60 / user / month</span></div>
+            <div class="barwrap"><div class="b" style="width:69%;background:var(--warn)"></div><span class="n" style="color:var(--warn)">$38,400</span></div></div>
+          <div class="barrow"><div class="lab">Dataverse + Power Apps Premium</div>
+            <div class="barwrap"><div class="b" style="width:86%;background:var(--crit)"></div><span class="n" style="color:var(--crit)">$48,000</span></div></div>
+        </div>
+        <div style="font-size:11.5px;color:var(--mute);margin-top:10px;border-top:1px solid var(--line);padding-top:9px">
+          One-time implementation, recommended hybrid: ≈ 20 partner days plus 250 internal hours, SAR 60,000–100,000.</div>
+      </div>
+      <div class="card">
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:2px;color:var(--brass);margin-bottom:9px">RECURRING, PER YEAR</div>
+        <div style="font-size:12.5px;display:grid;gap:5px;font-variant-numeric:tabular-nums">
+          <div style="display:flex;justify-content:space-between"><span>Power Automate Process ×1</span><b>$1,800</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Power BI Pro × 30</span><b>$5,040</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Backup storage · 200 GB</span><b>$360</b></div>
+          <div style="display:flex;justify-content:space-between"><span>SMS · ≈2,000 segments</span><b>$80</b></div>
+          <div style="display:flex;justify-content:space-between"><span>eSignature · ≈200 envelopes</span><b>$400</b></div>
+          <div style="display:flex;justify-content:space-between;color:var(--mute)"><span>Power Apps Premium</span><b>$0</b></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:9px;padding-top:8px">
+          <span style="font-family:var(--serif);font-size:16px;font-weight:700;color:var(--navy)">Total</span>
+          <span style="font-family:var(--serif);font-size:22px;font-weight:700;color:var(--ok)">$7,680</span></div>
+        <div style="font-size:11px;font-style:italic;color:var(--mute);margin-top:4px">≈ $3.20 per user per month at 200 users</div>
+      </div>
+    </div>
+    <div class="foot">Microsoft published US list prices at September 2026; CSP pricing in the Kingdom will differ.</div>
+  </div>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────── -->
+<section class="slide" data-notes="Ladders are configured per document type, so GOSI (90-day validity) uses 30/14/7/3/1 while an ISO certificate uses 180/120/90/60/30/14. Compliance changes these by editing a list row, not a flow.">
+  <div class="kick">Alerting</div><div class="ar">سُلّم التنبيهات</div>
+  <h1>Escalation widens the audience, not just the frequency</h1>
+  <div class="body">
+    <svg viewBox="0 0 1160 290" role="img" aria-label="Timeline from 180 days before expiry to overdue, showing which channels and recipients activate at each tier" style="width:100%;height:auto">
+      <g font-family="Segoe UI, Arial, sans-serif">
+        <text x="126" y="26" font-size="11" font-weight="700" letter-spacing="2" fill="#5D6875">DAYS BEFORE EXPIRY</text>
+        <line x1="126" y1="56" x2="900" y2="56" stroke="#9AA6B4" stroke-width="2"/>
+        <line x1="900" y1="56" x2="1120" y2="56" stroke="#A02828" stroke-width="3.5"/>
+        <line x1="900" y1="28" x2="900" y2="250" stroke="#A02828" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text x="900" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#A02828">EXPIRY</text>
+        <text x="960" y="20" font-size="12" font-weight="700" fill="#A02828">overdue · daily</text>
+
+        <circle cx="126" cy="56" r="7" fill="#2C6E3C"/><text x="126" y="82" text-anchor="middle" font-size="12" fill="#2C6E3C">180</text>
+        <circle cx="234" cy="56" r="7" fill="#2C6E3C"/><text x="234" y="82" text-anchor="middle" font-size="12" fill="#2C6E3C">120</text>
+        <circle cx="360" cy="56" r="7" fill="#2C6E3C"/><text x="360" y="82" text-anchor="middle" font-size="12" fill="#2C6E3C">90</text>
+        <circle cx="486" cy="56" r="7" fill="#2C6E3C"/><text x="486" y="82" text-anchor="middle" font-size="12" fill="#2C6E3C">60</text>
+        <circle cx="620" cy="56" r="8" fill="#B5730C"/><text x="620" y="82" text-anchor="middle" font-size="12" font-weight="700" fill="#B5730C">30</text>
+        <circle cx="738" cy="56" r="8" fill="#B5730C"/><text x="738" y="82" text-anchor="middle" font-size="12" font-weight="700" fill="#B5730C">14</text>
+        <circle cx="836" cy="56" r="9" fill="#A02828"/><text x="836" y="82" text-anchor="middle" font-size="12" font-weight="700" fill="#A02828">7</text>
+        <circle cx="884" cy="56" r="7" fill="#A02828"/><text x="884" y="82" text-anchor="middle" font-size="12" fill="#A02828">1</text>
+
+        <text x="24" y="120" font-size="11" font-weight="700" letter-spacing="1" fill="#5D6875">EMAIL</text>
+        <rect x="126" y="106" width="774" height="18" rx="9" fill="#1F4E86" opacity=".42"/>
+        <rect x="900" y="106" width="220" height="18" rx="9" fill="#A02828" opacity=".5"/>
+        <text x="24" y="156" font-size="11" font-weight="700" letter-spacing="1" fill="#5D6875">TEAMS</text>
+        <rect x="360" y="142" width="540" height="18" rx="9" fill="#1F4E86" opacity=".42"/>
+        <rect x="900" y="142" width="220" height="18" rx="9" fill="#A02828" opacity=".5"/>
+        <text x="24" y="192" font-size="11" font-weight="700" letter-spacing="1" fill="#5D6875">SMS</text>
+        <rect x="836" y="178" width="64" height="18" rx="9" fill="#B0813A" opacity=".6"/>
+        <rect x="900" y="178" width="220" height="18" rx="9" fill="#A02828" opacity=".5"/>
+
+        <text x="24" y="232" font-size="11" font-weight="700" letter-spacing="1" fill="#5D6875">TO</text>
+        <rect x="126" y="216" width="494" height="24" fill="#9AA6B4" opacity=".26"/>
+        <text x="136" y="232" font-size="12" fill="#161B22">Document Owner · Backup Owner · Dept Owner</text>
+        <rect x="620" y="216" width="216" height="24" fill="#B5730C" opacity=".26"/>
+        <text x="630" y="232" font-size="12" fill="#161B22">+ Escalation Manager</text>
+        <rect x="836" y="216" width="284" height="24" fill="#A02828" opacity=".26"/>
+        <text x="908" y="232" font-size="12" fill="#161B22">+ Executive Sponsor</text>
+      </g>
+    </svg>
+    <div class="card">
+      <div class="t" style="margin-bottom:4px">Two rules that keep it credible</div>
+      <div class="d">SMS only inside the last seven days — used earlier it becomes ordinary, and an ordinary SMS alert is an ignored one. &nbsp;·&nbsp; Every send is guarded by an idempotency key, so re-running the flow sends nothing twice.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────── -->
+<section class="slide" data-notes="The compliance officer role is the one auditors ask about: someone must be able to fix a record, and nobody should be able to erase the trail.">
+  <div class="kick">Access control</div><div class="ar">الصلاحيات</div>
+  <h1>Six roles — two of them exist to close real holes</h1>
+  <div class="body">
+    <div class="grid g3" style="gap:12px">
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span style="width:11px;height:11px;border-radius:50%;background:var(--navy);flex:none"></span><div class="t">System Administrator</div></div>
+        <div style="font-size:11.5px;color:var(--mute);direction:rtl;text-align:left;margin:2px 0 5px">مسؤول النظام</div>
+        <div class="d" style="margin:0">Full control. Two named people, elevated only when needed.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span style="width:11px;height:11px;border-radius:50%;background:var(--crit);flex:none"></span><div class="t">Compliance Officer</div></div>
+        <div style="font-size:11.5px;color:var(--mute);direction:rtl;text-align:left;margin:2px 0 5px">مسؤول الامتثال</div>
+        <div class="d" style="margin:0">Can correct anything. Can delete nothing — a custom role removes delete rights so evidence survives.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span style="width:11px;height:11px;border-radius:50%;background:var(--blue);flex:none"></span><div class="t">Document Owner</div></div>
+        <div style="font-size:11.5px;color:var(--mute);direction:rtl;text-align:left;margin:2px 0 5px">مالك الوثيقة</div>
+        <div class="d" style="margin:0">Creates and maintains documents in their own department. Roughly 25 people.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span style="width:11px;height:11px;border-radius:50%;background:var(--blue);flex:none"></span><div class="t">Approver</div></div>
+        <div style="font-size:11.5px;color:var(--mute);direction:rtl;text-align:left;margin:2px 0 5px">موجّه</div>
+        <div class="d" style="margin:0">Sees and decides only what is routed to them.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span style="width:11px;height:11px;border-radius:50%;background:var(--blue);flex:none"></span><div class="t">Reader</div></div>
+        <div style="font-size:11.5px;color:var(--mute);direction:rtl;text-align:left;margin:2px 0 5px">قارئ</div>
+        <div class="d" style="margin:0">Sees that a document exists and when it expires. Opens the file only if its sensitivity allows.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span style="width:11px;height:11px;border-radius:50%;background:var(--brass);flex:none"></span><div class="t">Delegate</div></div>
+        <div style="font-size:11.5px;color:var(--mute);direction:rtl;text-align:left;margin:2px 0 5px">مفوَّض مؤقت</div>
+        <div class="d" style="margin:0">Time-boxed cover during leave. Expires by itself — no cleanup step anyone can forget.</div></div>
+    </div>
+    <div class="card" style="background:var(--navy);border-color:var(--navy)">
+      <div style="font-size:13px;color:var(--ice)">Permissions scale with departments, not documents. Metadata stays open to everyone; the files are partitioned by department and sensitivity. Per-item permissions would collapse past 5,000 documents.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────── -->
+<section class="slide" data-notes="The two open questions are deliberately on this slide rather than buried in a risk register. Neither can be answered by IT alone, and both gate go-live.">
+  <div class="kick">Compliance</div><div class="ar">الامتثال التنظيمي</div>
+  <h1>Saudi PDPL first, ISO second</h1>
+  <div class="body">
+    <div class="grid g4">
+      <div class="card tile"><div class="v" style="color:var(--crit);font-size:32px">SAR 5M</div><div class="k">maximum fine, doubled for repeat violations</div></div>
+      <div class="card tile"><div class="v" style="color:var(--warn);font-size:32px">72 hrs</div><div class="k">to notify SDAIA of a reportable breach</div></div>
+      <div class="card tile"><div class="v" style="color:var(--blue);font-size:32px">Sep 2024</div><div class="k">PDPL fully enforceable; enforcement now active</div></div>
+      <div class="card tile"><div class="v" style="color:var(--ok);font-size:32px">7.5.3</div><div class="k">the ISO 9001 clause this system implements directly</div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <div style="font-family:var(--serif);font-size:17px;font-weight:700;color:var(--navy);margin-bottom:8px">What the system provides</div>
+        <ul style="margin:0;padding-inline-start:18px;font-size:12.5px;line-height:1.75">
+          <li>Breach runbook rehearsed against the 72-hour clock</li>
+          <li>Data subject access, correction and export routines</li>
+          <li>Write-once audit log with before and after state</li>
+          <li>Approval before issue, review dates, version identity</li>
+          <li>Encryption, DLP, Conditional Access, real backup</li>
+        </ul>
+      </div>
+      <div class="card" style="background:#FDF6E9;border-color:#E5D3AE">
+        <div class="row" style="align-items:center;gap:9px;margin-bottom:7px"><span class="seal s">?</span>
+          <div style="font-family:var(--serif);font-size:17px;font-weight:700;color:#7A5A1E">Two questions Legal must answer in week 1</div></div>
+        <div style="font-size:12px;line-height:1.5;display:grid;gap:7px">
+          <div><b>Where is the Microsoft 365 tenant hosted?</b> SDAIA has published no adequacy list, so if the tenant sits outside the Kingdom, every transfer needs approved standard contractual clauses — before go-live, not after.</div>
+          <div><b>Must a Data Protection Officer be appointed?</b> Required where sensitive data is processed at scale or transferred cross-border, and the appointment must be registered.</div>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-style:italic;color:var(--mute)">PDPL guidance summarises publicly available material and is not legal advice — confirm obligations with counsel.</div>
+  </div>
+</section>
+
+<!-- 10 ────────────────────────────────────────────── -->
+<section class="slide" data-notes="This slide is the credibility slide. Anyone who has run a SharePoint tracker recognises at least three of these.">
+  <div class="kick">Risk of building it badly</div><div class="ar">أعطال شائعة</div>
+  <h1>What usually goes wrong — and why it will not here</h1>
+  <div class="body">
+    <div class="grid g3" style="gap:11px">
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span class="seal s crit">1</span><div class="t">The frozen Today()</div></div>
+        <div class="d">A calculated column stops updating and quietly lies.</div>
+        <div style="border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:11.5px;font-weight:600;color:var(--ok)">Stamped nightly; the dashboard alarms on any disagreement.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span class="seal s crit">2</span><div class="t">Duplicate alert storms</div></div>
+        <div class="d">Re-run flows send the same alert twice; people filter the sender.</div>
+        <div style="border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:11.5px;font-weight:600;color:var(--ok)">An idempotency key checked before every single send.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span class="seal s crit">3</span><div class="t">Silent flow death</div></div>
+        <div class="d">The thing that raises alerts is the thing that died.</div>
+        <div style="border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:11.5px;font-weight:600;color:var(--ok)">A watchdog escalates if no run summary appears in 26 hours.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span class="seal s crit">4</span><div class="t">Version history explosion</div></div>
+        <div class="d">Writing every row nightly destroys the audit signal.</div>
+        <div style="border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:11.5px;font-weight:600;color:var(--ok)">Write only where a value actually changed.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span class="seal s crit">5</span><div class="t">The 5,000-item threshold</div></div>
+        <div class="d">Works with 200 rows, breaks in production two years later.</div>
+        <div style="border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:11.5px;font-weight:600;color:var(--ok)">Nine indexed columns; every view filters on one.</div></div>
+      <div class="card"><div class="row" style="gap:9px;align-items:center"><span class="seal s crit">6</span><div class="t">Recycle bin as backup</div></div>
+        <div class="d">93 days is not a backup policy.</div>
+        <div style="border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:11.5px;font-weight:600;color:var(--ok)">A real backup product with a rehearsed restore drill.</div></div>
+    </div>
+    <div class="foot">All six share one signature: the system keeps looking healthy after it has stopped working. A green dashboard fed by stale data is worse than no dashboard, because it stops anyone asking the question.</div>
+  </div>
+</section>
+
+<!-- 11 ────────────────────────────────────────────── -->
+<section class="slide" data-notes="Phase 0 is numbered zero deliberately — discovery is not implementation, and the two questions for Legal sit inside it.">
+  <div class="kick">Delivery plan</div><div class="ar">خطة التنفيذ</div>
+  <h1>Sixteen weeks, seven phases, one hard gate</h1>
+  <div class="body">
+    <div>
+      <div style="display:grid;grid-template-columns:230px 1fr;gap:12px;margin-bottom:5px">
+        <span style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--mute)">WEEK</span>
+        <div style="display:grid;grid-template-columns:repeat(16,1fr);font-family:var(--mono);font-size:10px;color:var(--mute);text-align:center">
+          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span></div>
+      </div>
+      <div class="grid" style="gap:7px">
+        <div style="display:grid;grid-template-columns:230px 1fr;gap:12px;align-items:center"><div class="row" style="gap:9px;align-items:center"><span class="seal s" style="width:22px;height:22px;font-size:11px">0</span><span style="font-size:12.5px;font-weight:600">Discovery &amp; audit</span></div>
+          <div style="position:relative;height:22px;background:var(--sunk);border-radius:2px"><div style="position:absolute;left:0%;width:12.5%;height:100%;background:var(--blue);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:#fff;font-weight:700">W1–2</div></div></div>
+        <div style="display:grid;grid-template-columns:230px 1fr;gap:12px;align-items:center"><div class="row" style="gap:9px;align-items:center"><span class="seal s" style="width:22px;height:22px;font-size:11px">1</span><span style="font-size:12.5px;font-weight:600">Foundation &amp; migration</span></div>
+          <div style="position:relative;height:22px;background:var(--sunk);border-radius:2px"><div style="position:absolute;left:12.5%;width:18.75%;height:100%;background:var(--blue);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:#fff;font-weight:700">W3–5</div></div></div>
+        <div style="display:grid;grid-template-columns:230px 1fr;gap:12px;align-items:center"><div class="row" style="gap:9px;align-items:center"><span class="seal s" style="width:22px;height:22px;font-size:11px">2</span><span style="font-size:12.5px;font-weight:600">Automation</span></div>
+          <div style="position:relative;height:22px;background:var(--sunk);border-radius:2px"><div style="position:absolute;left:31.25%;width:18.75%;height:100%;background:var(--blue);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:#fff;font-weight:700">W6–8</div></div></div>
+        <div style="display:grid;grid-template-columns:230px 1fr;gap:12px;align-items:center"><div class="row" style="gap:9px;align-items:center"><span class="seal s" style="width:22px;height:22px;font-size:11px">3</span><span style="font-size:12.5px;font-weight:600">Experience layer</span></div>
+          <div style="position:relative;height:22px;background:var(--sunk);border-radius:2px"><div style="position:absolute;left:50%;width:12.5%;height:100%;background:var(--blue);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:#fff;font-weight:700">W9–10</div></div></div>
+        <div style="display:grid;grid-template-columns:230px 1fr;gap:12px;align-items:center"><div class="row" style="gap:9px;align-items:center"><span class="seal s" style="width:22px;height:22px;font-size:11px">4</span><span style="font-size:12.5px;font-weight:600">Power BI &amp; KPIs</span></div>
+          <div style="position:relative;height:22px;background:var(--sunk);border-radius:2px"><div style="position:absolute;left:62.5%;width:12.5%;height:100%;background:var(--blue);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:#fff;font-weight:700">W11–12</div></div></div>
+        <div style="display:grid;grid-template-columns:230px 1fr;gap:12px;align-items:center"><div class="row" style="gap:9px;align-items:center"><span class="seal s" style="width:22px;height:22px;font-size:11px">5</span><span style="font-size:12.5px;font-weight:600">Security hardening</span></div>
+          <div style="position:relative;height:22px;background:var(--sunk);border-radius:2px"><div style="position:absolute;left:75%;width:12.5%;height:100%;background:var(--blue);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:#fff;font-weight:700">W13–14</div></div></div>
+        <div style="display:grid;grid-template-columns:230px 1fr;gap:12px;align-items:center"><div class="row" style="gap:9px;align-items:center"><span class="seal s crit" style="width:22px;height:22px;font-size:11px">6</span><span style="font-size:12.5px;font-weight:600">UAT, shadow run, go-live</span></div>
+          <div style="position:relative;height:22px;background:var(--sunk);border-radius:2px"><div style="position:absolute;left:87.5%;width:12.5%;height:100%;background:var(--crit);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:#fff;font-weight:700">W15–16</div></div></div>
+      </div>
+    </div>
+    <div class="card row" style="background:var(--navy);border-color:var(--navy);align-items:center">
+      <span class="seal m crit">!</span>
+      <div style="font-size:13px;color:var(--ice);line-height:1.5"><b style="color:#fff">The shadow run is the acceptance test, not contingency.</b>
+        Two full weeks running in parallel with the existing list before it is switched off. Zero missed expiries, or we do not go live. The cost of an extra fortnight is trivial; the cost of a lapsed commercial registration discovered by a client is not.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 ────────────────────────────────────────────── -->
+<section class="slide dark" data-notes="Close on the two numbers and the five names. Do not leave the room without an executive sponsor named.">
+  <div style="position:absolute;left:-160px;bottom:-170px;width:420px;height:420px;border-radius:50%;background:#1F4E86;opacity:.28"></div>
+  <div class="kick">The ask</div>
+  <h1>Five decisions and one budget line</h1>
+  <div style="font-size:15px;color:#8A9AB0;direction:rtl;text-align:left;margin-top:4px">خمسة قرارات وبند ميزانية واحد</div>
+  <div class="body" style="position:relative">
+    <div style="display:grid;grid-template-columns:1fr 290px;gap:22px;align-items:start">
+      <div class="grid" style="gap:11px">
+        <div class="row" style="gap:11px"><span class="seal s">1</span><div style="min-width:150px"><div class="t" style="color:#fff">Tenant data region</div><div style="font-size:10.5px;font-weight:700;color:var(--brass);letter-spacing:.5px">LEGAL + IT</div></div>
+          <div class="d" style="flex:1;margin:0">Is the Microsoft 365 tenant inside the Kingdom? Determines whether PDPL cross-border machinery applies to the whole system.</div></div>
+        <div class="row" style="gap:11px"><span class="seal s">2</span><div style="min-width:150px"><div class="t" style="color:#fff">Backup product</div><div style="font-size:10.5px;font-weight:700;color:var(--brass);letter-spacing:.5px">IT</div></div>
+          <div class="d" style="flex:1;margin:0">Microsoft 365 Backup or a third party. Sets both the cost line and the recovery commitment we can make.</div></div>
+        <div class="row" style="gap:11px"><span class="seal s">3</span><div style="min-width:150px"><div class="t" style="color:#fff">eSignature approach</div><div style="font-size:10.5px;font-weight:700;color:var(--brass);letter-spacing:.5px">LEGAL</div></div>
+          <div class="d" style="flex:1;margin:0">In-tenant SharePoint eSignature, or Adobe / DocuSign for stronger standing with counterparties.</div></div>
+        <div class="row" style="gap:11px"><span class="seal s">4</span><div style="min-width:150px"><div class="t" style="color:#fff">Build model</div><div style="font-size:10.5px;font-weight:700;color:var(--brass);letter-spacing:.5px">MANAGEMENT</div></div>
+          <div class="d" style="flex:1;margin:0">Internal, partner-led, or the recommended hybrid. This determines the calendar more than anything else.</div></div>
+        <div class="row" style="gap:11px"><span class="seal s">5</span><div style="min-width:150px"><div class="t" style="color:#fff">Executive sponsor</div><div style="font-size:10.5px;font-weight:700;color:var(--brass);letter-spacing:.5px">MANAGEMENT</div></div>
+          <div class="d" style="flex:1;margin:0">The escalation ladder terminates somewhere. Who sits at the top, by name.</div></div>
+      </div>
+      <div style="background:#fff;border-radius:4px;padding:20px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--brass)">BUDGET LINE</div>
+        <div style="font-family:var(--serif);font-size:42px;font-weight:700;color:var(--navy);line-height:1.05;margin-top:6px">$7,680</div>
+        <div style="font-size:11.5px;color:var(--mute)">recurring per year</div>
+        <div style="border-top:1px solid var(--line);margin:14px 0 10px"></div>
+        <div style="font-family:var(--serif);font-size:23px;font-weight:700;color:var(--navy)">SAR 60k–100k</div>
+        <div style="font-size:11.5px;color:var(--mute)">one-time, hybrid build</div>
+        <div style="font-size:11.5px;font-style:italic;color:var(--blue);margin-top:14px;line-height:1.45">Against SAR 144,000 a year for a commercial product covering less.</div>
+      </div>
+    </div>
+    <div style="font-size:13px;color:#8A9AB0">Scripts, flow specifications, DAX measures and a 94-case test plan are written and ready. Week 1 starts with the two questions for Legal.</div>
+  </div>
+</section>
+
+</div></div>
+
+<div class="zone l" id="zl" title="Previous"></div>
+<div class="zone r" id="zr" title="Next"></div>
+<div id="bar"><div id="barfill"></div></div>
+<div id="hud">
+  <button id="bPrev" type="button">◀</button>
+  <span id="count">1 / 12</span>
+  <button id="bNext" type="button">▶</button>
+  <button id="bNotes" type="button">Notes</button>
+  <button id="bFull" type="button">Full screen</button>
+  <button id="bPrint" type="button">PDF</button>
+</div>
+<div id="notes"><b>Speaker notes</b><span id="noteText"></span></div>
+
+<script>
+(function () {
+  "use strict";
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var n = slides.length, i = 0, notesOn = false;
+  var scaler = document.getElementById('scaler');
+
+  function fit() {
+    var pad = 24;
+    var s = Math.min((window.innerWidth - pad) / 1280,
+                     (window.innerHeight - pad - (notesOn ? window.innerHeight * 0.38 : 0)) / 720);
+    scaler.style.transform = 'scale(' + Math.max(0.2, s) + ')';
+  }
+  function show(k) {
+    i = Math.max(0, Math.min(n - 1, k));
+    slides.forEach(function (s, j) { s.classList.toggle('on', j === i); });
+    document.getElementById('count').textContent = (i + 1) + ' / ' + n;
+    document.getElementById('barfill').style.width = (((i + 1) / n) * 100) + '%';
+    document.getElementById('noteText').textContent = slides[i].getAttribute('data-notes') || '—';
+    try { location.hash = String(i + 1); } catch (e) {}
+  }
+  function next() { show(i + 1); }
+  function prev() { show(i - 1); }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') { show(0); }
+    else if (e.key === 'End') { show(n - 1); }
+    else if (e.key === 'n' || e.key === 'N') { toggleNotes(); }
+    else if (e.key === 'f' || e.key === 'F') { toggleFull(); }
+    else if (e.key === 'Escape' && notesOn) { toggleNotes(); }
+    else if (/^[0-9]$/.test(e.key)) { var d = +e.key; if (d >= 1 && d <= n) show(d - 1); }
+  });
+  document.getElementById('zl').onclick = prev;
+  document.getElementById('zr').onclick = next;
+  document.getElementById('bPrev').onclick = function (e) { e.stopPropagation(); prev(); };
+  document.getElementById('bNext').onclick = function (e) { e.stopPropagation(); next(); };
+
+  function toggleNotes() {
+    notesOn = !notesOn;
+    document.getElementById('notes').classList.toggle('on', notesOn);
+    fit();
+  }
+  document.getElementById('bNotes').onclick = function (e) { e.stopPropagation(); toggleNotes(); };
+
+  function toggleFull() {
+    if (document.fullscreenElement) { document.exitFullscreen && document.exitFullscreen(); }
+    else { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
+  }
+  document.getElementById('bFull').onclick = function (e) { e.stopPropagation(); toggleFull(); };
+  document.getElementById('bPrint').onclick = function (e) { e.stopPropagation(); window.print(); };
+
+  window.addEventListener('resize', fit);
+  document.addEventListener('fullscreenchange', fit);
+
+  var start = parseInt((location.hash || '').replace('#', ''), 10);
+  show(isNaN(start) ? 0 : start - 1);
+  fit();
+})();
+</script>
+</body>
+</html>
